@@ -28,7 +28,9 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
+import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.StompClient
 
 
 class MainActivity : ComponentActivity() {
@@ -53,6 +55,19 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun CarcassonneMainScreen(navController: NavController) {
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val stompClient = remember {
+        StompClient(
+            object : Callbacks {
+                override fun onResponse(res: String) {
+                    Toast.makeText(context, res, Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
             painter = painterResource(id = R.drawable.c_bg),
@@ -74,6 +89,11 @@ fun CarcassonneMainScreen(navController: NavController) {
                 StyledGameButton(
                     label = "Join Game",
                     onClick = {
+
+                        // connect to WebSocket
+                        coroutineScope.launch {
+                            stompClient.connect()
+                        }
                         navController.navigate("join_game")
                     }
                 )
