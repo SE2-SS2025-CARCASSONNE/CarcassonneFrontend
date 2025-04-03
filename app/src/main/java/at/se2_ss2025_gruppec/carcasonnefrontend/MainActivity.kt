@@ -1,6 +1,7 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -281,6 +282,7 @@ fun CreateGameScreen() {
                                 gameId = response.gameId //Set backend response
                                 Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
                             } catch (e: Exception) {
+                                Log.d("RetroFit", "Error: ${e.message}")
                                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         }
