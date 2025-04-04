@@ -94,7 +94,7 @@ tasks.register<JacocoReport>("jacocoTestReport") {
 
 sonar {
     properties {
-        property("sonar.projectKey", "SE2-SS2025-CARCASSONNE_frontend")
+        property("sonar.projectKey", "SE2-SS2025-CARCASSONNE_CarcassonneFrontend")
         property("sonar.organization", "se2-ss2025-carcassonne")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.java.coveragePlugin", "jacoco")
