@@ -17,74 +17,51 @@ import org.json.JSONObject
 
 class StompClient(val callbacks: Callbacks) {
 
-    private  val WEBSOCKET_URI = "ws://10.0.2.2:8080/websocket-example-broker";
+    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game/websocket"
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job
 
     private lateinit var jsonFlow: Flow<String>
-    private lateinit var jsonCollector:Job
+    private lateinit var jsonCollector: Job
 
-    private lateinit var client:StompClient
-    private lateinit var session: StompSession
+    private lateinit var client: StompClient
+    private var session: StompSession? = null
 
-    private val scope:CoroutineScope=CoroutineScope(Dispatchers.IO)
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
-    private fun callback(msg:String){
-        Handler(Looper.getMainLooper()).post{
+    private fun callback(msg: String) {
+        Handler(Looper.getMainLooper()).post {
             callbacks.onResponse(msg)
         }
     }
 
     fun connect() {
-
-        client = StompClient(OkHttpWebSocketClient()) // other config can be passed in here
+        client = StompClient(OkHttpWebSocketClient())
         scope.launch {
             try {
                 session = client.connect(WEBSOCKET_URI)
-                topicFlow= session.subscribeText("/topic/hello-response")
-                //connect to topic
-                collector=scope.launch {
-                    topicFlow.collect{
-                        msg->
-                    //todo logic
-                    callback(msg)
-                    }
-                }
-
-                //connect to topic
-                jsonFlow= session.subscribeText("/topic/rcv-object")
-                jsonCollector=scope.launch {
-                    jsonFlow.collect{
-                        msg->
-                    var jsonObject= JSONObject(msg)
-                    callback(jsonObject.getString("text"))
-                    }
-                }
-                callback("connected")
+                callback("WebSocket connected")
             } catch (e: Exception) {
                 Log.e("WebSocket", "Connection failed: ${e.message}")
                 callback("Connection failed: ${e.message}")
             }
         }
-
     }
 
-    fun sendHello(){
+    fun sendHello() {
         scope.launch {
-
             try {
-                session.sendText("/app/hello","message from client")
-                Log.d("WebSocket","Message sent: Hello")
+                session?.sendText("/app/hello", "message from client")
+                Log.d("WebSocket", "Message sent: Hello")
             } catch (e: Exception) {
-                Log.d("WebSocket","Message sent: Hello")
+                Log.e("WebSocket", "Failed to send hello: ${e.message}")
             }
-
         }
     }
 
-    fun sendJson(){
-        var json=JSONObject().apply {
+    fun sendJson() {
+        val json = JSONObject().apply {
             put("from", "client")
             put("text", "from client")
         }
@@ -92,13 +69,50 @@ class StompClient(val callbacks: Callbacks) {
 
         scope.launch {
             try {
-                session.sendText("/app/object", message);
+                session?.sendText("/app/object", message)
                 Log.d("WebSocket", "JSON message sent: $message")
-
-            } catch (e: Exception){
+            } catch (e: Exception) {
                 Log.e("WebSocket", "Failed to send JSON: ${e.message}")
             }
         }
     }
 
+    fun sendStartGame(gameId: String) {
+        val json = JSONObject().apply {
+            put("type", "start_game")
+            put("gameId", gameId)
+            put("player", "HOST") //Should be replaced with actual player ID later
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "Start game message sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send start game: ${e.message}")
+            }
+        }
+    }
+
+    fun listenOn(topic: String, onMessage: (String) -> Unit) {
+        scope.launch {
+            try {
+                val activeSession = session
+                if (activeSession == null) {
+                    Log.e("WebSocket", "Cannot listen - session not initialized")
+                    return@launch
+                }
+                val flow = activeSession.subscribeText(topic)
+                flow.collect { msg ->
+                    Log.d("WebSocket", "Received message on $topic: $msg")
+                    onMessage(msg)
+                }
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to listen on $topic: ${e.message}")
+            }
+        }
+    }
+    fun isConnected(): Boolean {
+        return session != null
+    }
 }

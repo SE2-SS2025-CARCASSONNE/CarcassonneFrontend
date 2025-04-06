@@ -5,7 +5,6 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
 
-//Define request/response models HERE only
 data class CreateGameRequest(val playerCount: Int)
 data class CreateGameResponse(val gameId: String)
 
@@ -18,7 +17,7 @@ interface GameApi {
 //Singleton Retrofit client
 object ApiClient {
     val retrofit: GameApi = Retrofit.Builder()
-        .baseUrl("http://10.0.2.2:8080/") // Emulator uses 10.0.2.2 to access localhost
+        .baseUrl("http://10.0.2.2:8080/")
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(GameApi::class.java)
