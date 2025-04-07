@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -29,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -436,20 +440,159 @@ fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: In
     }
 }
 
+data class Tile(
+    val top: Color,
+    val right: Color,
+    val bottom: Color,
+    val left: Color
+) {
+    fun rotated(): Tile {
+        return Tile(
+            top = left,
+            right = top,
+            bottom = right,
+            left = bottom
+        )
+    }
+}
+
+fun generateRandomTile(): Tile {
+    val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow)
+    return Tile(
+        top = colors.random(),
+        right = colors.random(),
+        bottom = colors.random(),
+        left = colors.random()
+    )
+}
+
+fun canPlaceTile(
+    grid: List<List<Tile?>>, x: Int, y: Int, tile: Tile
+): Boolean {
+    val top = if (y > 0) grid[y - 1][x] else null
+    val bottom = if (y < grid.size - 1) grid[y + 1][x] else null
+    val left = if (x > 0) grid[y][x - 1] else null
+    val right = if (x < grid[y].size - 1) grid[y][x + 1] else null
+
+    if (top == null && bottom == null && left == null && right == null) return false
+
+    return (top == null || top.bottom == tile.top) &&
+            (bottom == null || bottom.top == tile.bottom) &&
+            (left == null || left.right == tile.left) &&
+            (right == null || right.left == tile.right)
+}
+
 @Composable
-fun GameplayScreen(gameId: String) {
+fun TileView(tile: Tile) {
     Box(
         modifier = Modifier
+            .size(64.dp)
+            .border(2.dp, Color.White)
+            .drawBehind {
+                val width = size.width
+                val height = size.height
+                val edge = 10f
+
+                drawRect(color = tile.top, topLeft = Offset(0f, 0f), size = Size(width, edge))
+                drawRect(color = tile.right, topLeft = Offset(width - edge, 0f), size = Size(edge, height))
+                drawRect(color = tile.bottom, topLeft = Offset(0f, height - edge), size = Size(width, edge))
+                drawRect(color = tile.left, topLeft = Offset(0f, 0f), size = Size(edge, height))
+                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
+            }
+    )
+}
+
+@Composable
+fun GameplayScreen(gameId: String) {
+    val gridSize = 5
+    val grid = remember {
+        mutableStateListOf<MutableList<Tile?>>().apply {
+            repeat(gridSize) {
+                add(MutableList(gridSize) { null })
+            }
+            this[gridSize / 2][gridSize / 2] = generateRandomTile() // center tile
+        }
+    }
+    val context = LocalContext.current
+    val currentTile = remember { mutableStateOf(generateRandomTile()) }
+
+    Column(
+        modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
-        contentAlignment = Alignment.Center
+            .background(Color.Black)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Gameplay Screen for Game: $gameId",
+            text = "Game ID: $gameId",
             color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 20.sp,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
+
+        //Grid
+        Column {
+            for (y in 0 until gridSize) {
+                Row {
+                    for (x in 0 until gridSize) {
+                        val tile = grid[y][x]
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .padding(2.dp)
+                                .background(Color.DarkGray)
+                                .clickable {
+                                    if (tile == null && canPlaceTile(grid, x, y, currentTile.value)) {
+                                        grid[y][x] = currentTile.value
+                                        currentTile.value = generateRandomTile()
+                                    } else {
+                                        Toast
+                                            .makeText(context, "Can't place tile here", Toast.LENGTH_SHORT)
+                                            .show()
+                                    }
+                                }
+                        ) {
+                            tile?.let {
+                                TileView(it)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text("Next Tile:", color = Color.White)
+        TileView(currentTile.value)
+        Button(
+            onClick = {
+                currentTile.value = generateRandomTile()
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Gray,
+                contentColor = Color.White
+            ),
+            modifier = Modifier
+                .padding(top = 12.dp)
+        ) {
+            Text("Skip Tile")
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Button(
+            onClick = {
+                currentTile.value = currentTile.value.rotated()
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Gray,
+                contentColor = Color.White
+            ),
+            modifier = Modifier
+                .padding(top = 12.dp)
+        ) {
+            Text("Rotate Tile")
+        }
     }
 }
 

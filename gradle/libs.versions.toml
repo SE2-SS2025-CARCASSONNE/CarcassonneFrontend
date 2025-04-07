@@ -42,6 +42,7 @@ krossbow-websocket-builtin = { module = "org.hildan.krossbow:krossbow-websocket-
 krossbow-websocket-okhttp = { module = "org.hildan.krossbow:krossbow-websocket-okhttp", version.ref = "krossbowWebsocketOkhttp" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 gson-converter = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "gson-converter" }
+ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

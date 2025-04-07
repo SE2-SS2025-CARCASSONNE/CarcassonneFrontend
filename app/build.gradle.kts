@@ -119,6 +119,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.material.icons.extended)
+    implementation("androidx.compose.ui:ui-graphics:1.6.0")
+
 
     //Retrofit + Gson
     implementation(libs.retrofit)

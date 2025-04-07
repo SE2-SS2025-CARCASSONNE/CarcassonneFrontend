@@ -1,0 +1,184 @@
+[1mdiff --git a/.github/workflows/build.yml b/.github/workflows/build.yml[m
+[1mnew file mode 100644[m
+[1mindex 0000000..f02281a[m
+[1m--- /dev/null[m
+[1m+++ b/.github/workflows/build.yml[m
+[36m@@ -0,0 +1,36 @@[m
+[32m+[m[32mname: SonarQube[m
+[32m+[m[32mon:[m
+[32m+[m[32m  push:[m
+[32m+[m[32m    branches:[m
+[32m+[m[32m      - main[m
+[32m+[m[32m  pull_request:[m
+[32m+[m[32m    types: [opened, synchronize, reopened][m
+[32m+[m[32mjobs:[m
+[32m+[m[32m  build:[m
+[32m+[m[32m    name: Build and analyze[m
+[32m+[m[32m    runs-on: ubuntu-latest[m
+[32m+[m[32m    steps:[m
+[32m+[m[32m      - uses: actions/checkout@v4[m
+[32m+[m[32m        with:[m
+[32m+[m[32m          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis[m
+[32m+[m[32m      - name: Set up JDK 17[m
+[32m+[m[32m        uses: actions/setup-java@v4[m
+[32m+[m[32m        with:[m
+[32m+[m[32m          java-version: 17[m
+[32m+[m[32m          distribution: 'zulu' # Alternative distribution options are available[m
+[32m+[m[32m      - name: Cache SonarQube packages[m
+[32m+[m[32m        uses: actions/cache@v4[m
+[32m+[m[32m        with:[m
+[32m+[m[32m          path: ~/.sonar/cache[m
+[32m+[m[32m          key: ${{ runner.os }}-sonar[m
+[32m+[m[32m          restore-keys: ${{ runner.os }}-sonar[m
+[32m+[m[32m      - name: Cache Gradle packages[m
+[32m+[m[32m        uses: actions/cache@v4[m
+[32m+[m[32m        with:[m
+[32m+[m[32m          path: ~/.gradle/caches[m
+[32m+[m[32m          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}[m
+[32m+[m[32m          restore-keys: ${{ runner.os }}-gradle[m
+[32m+[m[32m      - name: Build and analyze[m
+[32m+[m[32m        env:[m
+[32m+[m[32m          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}[m
+[32m+[m[32m        run: ./gradlew build sonar --info[m
+\ No newline at end of file[m
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mindex 9653fb8..afae8de 100644[m
+[1m--- a/.gitignore[m
+[1m+++ b/.gitignore[m
+[36m@@ -1,6 +1,7 @@[m
+ *.iml[m
+ .gradle[m
+ .idea[m
+[32m+[m[32m.kotlin[m
+ .DS_Store[m
+ /build[m
+ /captures[m
+[1mdiff --git a/.idea/deploymentTargetSelector.xml b/.idea/deploymentTargetSelector.xml[m
+[1mdeleted file mode 100644[m
+[1mindex d5d5c25..0000000[m
+[1m--- a/.idea/deploymentTargetSelector.xml[m
+[1m+++ /dev/null[m
+[36m@@ -1,10 +0,0 @@[m
+[31m-<?xml version="1.0" encoding="UTF-8"?>[m
+[31m-<project version="4">[m
+[31m-  <component name="deploymentTargetSelector">[m
+[31m-    <selectionStates>[m
+[31m-      <SelectionState runConfigName="CarcasonneFrontend.app">[m
+[31m-        <option name="selectionMode" value="DROPDOWN" />[m
+[31m-      </SelectionState>[m
+[31m-    </selectionStates>[m
+[31m-  </component>[m
+[31m-</project>[m
+\ No newline at end of file[m
+[1mdiff --git a/app/build.gradle.kts b/app/build.gradle.kts[m
+[1mindex 01fd12f..25feaa3 100644[m
+[1m--- a/app/build.gradle.kts[m
+[1m+++ b/app/build.gradle.kts[m
+[36m@@ -2,6 +2,8 @@[m [mplugins {[m
+     alias(libs.plugins.android.application)[m
+     alias(libs.plugins.kotlin.android)[m
+     alias(libs.plugins.kotlin.compose)[m
+[32m+[m[32m    id("jacoco")[m
+[32m+[m[32m    id("org.sonarqube") version "5.1.0.4882"[m
+ }[m
+ [m
+ android {[m
+[36m@@ -37,12 +39,76 @@[m [mandroid {[m
+     buildFeatures {[m
+         compose = true[m
+     }[m
+[32m+[m
+[32m+[m[32m    testOptions {[m
+[32m+[m[32m        unitTests {[m
+[32m+[m[32m            all {[m
+[32m+[m[32m                it.useJUnitPlatform()[m
+[32m+[m[32m                it.finalizedBy(tasks.named("jacocoTestReport"))[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mtasks.register<JacocoReport>("jacocoTestReport") {[m
+[32m+[m[32m    group = "verification"[m
+[32m+[m[32m    description = "Generates code coverage report for the test task."[m
+[32m+[m[32m    dependsOn("testDebugUnitTest")[m
+[32m+[m
+[32m+[m[32m    reports {[m
+[32m+[m[32m        xml.required.set(true)[m
+[32m+[m[32m        xml.outputLocation.set(file("${project.projectDir}/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"))[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    val fileFilter = listOf([m
+[32m+[m[32m        "**/R.class",[m
+[32m+[m[32m        "**/R$*.class",[m
+[32m+[m[32m        "**/BuildConfig.*",[m
+[32m+[m[32m        "**/Manifest*.*",[m
+[32m+[m[32m        "**/*Test*.*",[m
+[32m+[m[32m        "android/**/*.*"[m
+[32m+[m[32m    )[m
+[32m+[m
+[32m+[m[32m    val debugTree =[m
+[32m+[m[32m        fileTree("${project.layout.buildDirectory.get().asFile}/tmp/kotlin-classes/debug") {[m
+[32m+[m[32m            exclude(fileFilter)[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m    val javaDebugTree =[m
+[32m+[m[32m        fileTree("${project.layout.buildDirectory.get().asFile}/intermediates/javac/debug") {[m
+[32m+[m[32m            exclude(fileFilter)[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m    val mainSrc = listOf([m
+[32m+[m[32m        "${project.projectDir}/src/main/java",[m
+[32m+[m[32m        "${project.projectDir}/src/main/kotlin"[m
+[32m+[m[32m    )[m
+[32m+[m
+[32m+[m[32m    sourceDirectories.setFrom(files(mainSrc))[m
+[32m+[m[32m    classDirectories.setFrom(files(debugTree, javaDebugTree))[m
+[32m+[m[32m    executionData.setFrom(fileTree(project.layout.buildDirectory.get().asFile) {[m
+[32m+[m[32m        include("jacoco/testDebugUnitTest.exec")[m
+[32m+[m[32m        include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")[m
+[32m+[m[32m    })[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32msonar {[m
+[32m+[m[32m    properties {[m
+[32m+[m[32m        property("sonar.projectKey", "SE2-SS2025-CARCASSONNE_CarcassonneFrontend")[m
+[32m+[m[32m        property("sonar.organization", "se2-ss2025-carcassonne")[m
+[32m+[m[32m        property("sonar.host.url", "https://sonarcloud.io")[m
+[32m+[m[32m        property("sonar.java.coveragePlugin", "jacoco")[m
+[32m+[m[32m        property([m
+[32m+[m[32m            "sonar.coverage.jacoco.xmlReportPaths",[m
+[32m+[m[32m            "${project.projectDir}/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"[m
+[32m+[m[32m        )[m
+[32m+[m[32m    }[m
+ }[m
+ [m
+ dependencies {[m
+[31m-    implementation("org.hildan.krossbow:krossbow-websocket-okhttp:7.0.0")[m
+[31m-    implementation("org.hildan.krossbow:krossbow-stomp-core:7.0.0")[m
+[31m-    implementation("org.hildan.krossbow:krossbow-websocket-builtin:7.0.0")[m
+[32m+[m[32m    implementation(libs.krossbow.websocket.okhttp)[m
+[32m+[m[32m    implementation(libs.krossbow.stomp.core)[m
+[32m+[m[32m    implementation(libs.krossbow.websocket.builtin)[m
+     implementation(libs.androidx.core.ktx)[m
+     implementation(libs.androidx.lifecycle.runtime.ktx)[m
+     implementation(libs.androidx.activity.compose)[m
+[36m@@ -59,6 +125,8 @@[m [mdependencies {[m
+     implementation(libs.gson.converter)[m
+ [m
+     testImplementation(libs.junit)[m
+[32m+[m[32m    testImplementation(libs.junit.jupiter.api)[m
+[32m+[m[32m    testRuntimeOnly(libs.junit.jupiter.engine)[m
+     androidTestImplementation(libs.androidx.junit)[m
+     androidTestImplementation(libs.androidx.espresso.core)[m
+     androidTestImplementation(platform(libs.androidx.compose.bom))[m
+[1mdiff --git a/app/src/main/java/at/se2_ss2025_gruppec/carcasonnefrontend/websocket/StompClient.kt b/app/src/main/java/at/se2_ss2025_gruppec/carcasonnefrontend/websocket/StompClient.kt[m
+[1mindex bc84fd6..8dd1c2f 100644[m
+[1m--- a/app/src/main/java/at/se2_ss2025_gruppec/carcasonnefrontend/websocket/StompClient.kt[m
+[1m+++ b/app/src/main/java/at/se2_ss2025_gruppec/carcasonnefrontend/websocket/StompClient.kt[m
+[36m@@ -17,7 +17,7 @@[m [mimport org.json.JSONObject[m
+ [m
+ class StompClient(val callbacks: Callbacks) {[m
+ [m
+[31m-    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game/websocket"[m
+[32m+[m[32m 
