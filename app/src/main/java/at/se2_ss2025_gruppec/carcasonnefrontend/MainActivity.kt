@@ -40,14 +40,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
-import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.StompClient
+import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val stompClient = StompClient(
+        val stompClient = MyClient(
             object : Callbacks {
                 override fun onResponse(res: String) {
                     Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun CarcassonneMainScreen(navController: NavController, stompClient: StompClient) {
+fun CarcassonneMainScreen(navController: NavController, stompClient: MyClient) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -296,7 +296,7 @@ fun CreateGameScreen(navController: NavController) {
 }
 
 @Composable
-fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: Int = 2, stompClient: StompClient, navController: NavController) {
+fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: Int = 2, stompClient: MyClient, navController: NavController) {
     val players = remember { mutableStateListOf(hostName) }
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
