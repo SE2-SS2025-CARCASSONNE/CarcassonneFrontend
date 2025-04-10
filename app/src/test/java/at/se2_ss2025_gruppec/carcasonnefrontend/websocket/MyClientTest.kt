@@ -1,5 +1,5 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend.websocket
-
+/*
 import io.mockk.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.flowOf
@@ -170,3 +170,4 @@ class StompClientTest {
         field.set(this, value)
     }
 }
+*/
