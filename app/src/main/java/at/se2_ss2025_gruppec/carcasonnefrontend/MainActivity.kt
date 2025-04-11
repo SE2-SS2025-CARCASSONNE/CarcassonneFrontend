@@ -59,13 +59,16 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             NavHost(navController = navController, startDestination = "main") {
                 composable("main") { CarcassonneMainScreen(navController, stompClient) }
-                composable("join_game") { JoinGameScreen() }
+                composable("join_game") { JoinGameScreen(navController) }
                 composable("create_game") { CreateGameScreen(navController) }
-                composable("lobby/{gameId}/{playerCount}") { backStackEntry ->
+                composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
                     val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
                     val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
+                    val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
+
                     LobbyScreen(
                         gameId = gameId,
+                        playerName = playerName,
                         playerCount = playerCount,
                         stompClient = stompClient,
                         navController = navController
@@ -125,8 +128,24 @@ fun CarcassonneMainScreen(navController: NavController, stompClient: MyClient) {
 }
 
 @Composable
-fun JoinGameScreen() {
+fun JoinGameScreen(navController: NavController = rememberNavController()) {
+    val context = LocalContext.current
     var gameId by remember { mutableStateOf("") }
+    var playerName by remember { mutableStateOf("") }
+
+    val stompClient = remember {
+        MyClient(object : Callbacks {
+            override fun onResponse(res: String) {
+                Toast.makeText(context, res, Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        stompClient.connect()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -161,7 +180,41 @@ fun JoinGameScreen() {
                             modifier = Modifier.fillMaxWidth(),
                         )
                     },
-                    modifier = Modifier.width(207.dp),
+                    modifier = Modifier.width(220.dp),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFFF4C2),
+                        textAlign = TextAlign.Center
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.Gray,
+                        cursorColor = Color.White,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.Gray,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = playerName,
+                    onValueChange = { playerName = it },
+                    placeholder = {
+                        Text(
+                            text = "#Enter your name",
+                            textAlign = TextAlign.Center,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFFF4C2),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                    modifier = Modifier.width(220.dp),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(
                         fontSize = 22.sp,
@@ -184,7 +237,20 @@ fun JoinGameScreen() {
 
                 Button(
                     onClick = {
-                        // TODO: Join with gameId
+                        if (gameId.isBlank() || playerName.isBlank()) {
+                            Toast.makeText(context, "Enter both game ID and player name", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
+                        coroutineScope.launch {
+                            try {
+                                val gameState = ApiClient.retrofit.getGame(gameId)
+                                val playerCount = gameState.players.size.coerceAtLeast(2)
+                                navController.navigate("lobby/$gameId/$playerCount/$playerName")
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Game not found or connection failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     },
                     modifier = Modifier
                         .width(130.dp)
@@ -210,8 +276,10 @@ fun JoinGameScreen() {
 @Composable
 fun CreateGameScreen(navController: NavController) {
     var selectedPlayers by remember { mutableStateOf(2) }
+    var playerName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboardManager.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -231,6 +299,39 @@ fun CreateGameScreen(navController: NavController) {
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // 👉 NAME FIELD
+                OutlinedTextField(
+                    value = playerName,
+                    onValueChange = { playerName = it },
+                    placeholder = {
+                        Text(
+                            text = "#Enter your name",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFFF4C2),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    },
+                    modifier = Modifier.width(220.dp),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFFF4C2),
+                        textAlign = TextAlign.Center
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.Gray,
+                        cursorColor = Color.White,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
@@ -259,17 +360,21 @@ fun CreateGameScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                val clipboardManager = LocalClipboardManager.current
-
                 Button(
                     onClick = {
+                        val hostName = playerName.trim()
+                        if (hostName.isEmpty()) {
+                            Toast.makeText(context, "Please enter your name", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
                         coroutineScope.launch {
                             try {
                                 val response = ApiClient.retrofit.createGame(
-                                    CreateGameRequest(playerCount = selectedPlayers)
+                                    CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
                                 Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
-                                navController.navigate("lobby/${response.gameId}/$selectedPlayers")
+                                navController.navigate("lobby/${response.gameId}/$selectedPlayers/$hostName")
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
@@ -296,27 +401,39 @@ fun CreateGameScreen(navController: NavController) {
 }
 
 @Composable
-fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: Int = 2, stompClient: MyClient, navController: NavController) {
-    val players = remember { mutableStateListOf(hostName) }
+fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompClient: MyClient, navController: NavController) {
+    val players = remember { mutableStateListOf(playerName) }
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+
     LaunchedEffect(Unit) {
         while (!stompClient.isConnected()) {
             delay(100)
         }
+        stompClient.sendJoinGame(gameId, playerName)
 
         stompClient.listenOn("/topic/game/$gameId") { message ->
             Log.d("WebSocket", "Received message: $message")
             val json = JSONObject(message)
-            if (json.getString("type") == "game_started") {
-                Log.d("WebSocket", "Navigating to gameplay screen")
-                Handler(Looper.getMainLooper()).post {
-                    navController.navigate("gameplay/$gameId")
+            when (json.getString("type")) {
+                "game_started" -> {
+                    Handler(Looper.getMainLooper()).post {
+                        navController.navigate("gameplay/$gameId")
+                    }
+                }
+                "player_joined" -> {
+                    val playerArray = json.getJSONArray("players")
+                    Handler(Looper.getMainLooper()).post {
+                        players.clear()
+                        for (i in 0 until playerArray.length()) {
+                            players.add(playerArray.getString(i))
+                        }
+                        Log.d("Lobby", "Updated players in lobby: $players")
+                    }
                 }
             }
         }
     }
-
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -350,10 +467,7 @@ fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: In
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .border(2.dp, Color(0xFFFFF4C2), RoundedCornerShape(12.dp))
@@ -393,7 +507,9 @@ fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: In
             Spacer(modifier = Modifier.height(24.dp))
 
             for (i in 1..playerCount) {
-                val playerName = players.getOrNull(i - 1) ?: "Empty Slot"
+                val playerNameInList = players.getOrNull(i - 1) ?: "Empty Slot"
+                Log.d("LobbyScreen", "Checking: [$playerNameInList] vs [$playerName]")
+                val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
 
                 Button(
                     onClick = { },
@@ -410,18 +526,19 @@ fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: In
                     )
                 ) {
                     Text(
-                        text = playerName,
+                        text = displayName,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
             }
+
             Spacer(modifier = Modifier.height(68.dp))
-            //Check if (players.size == playerCount) to show the button currently disabled for developing purposes.
+
             Button(
                 onClick = {
                     Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
-                    stompClient.sendStartGame(gameId);
+                    stompClient.sendStartGame(gameId)
                 },
                 modifier = Modifier
                     .width(200.dp)

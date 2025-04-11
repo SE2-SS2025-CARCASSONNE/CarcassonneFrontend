@@ -115,4 +115,20 @@ class MyClient(val callbacks: Callbacks) {
     fun isConnected(): Boolean {
         return session != null
     }
+    fun sendJoinGame(gameId: String, playerName: String) {
+        val json = JSONObject().apply {
+            put("type", "join_game")
+            put("gameId", gameId)
+            put("player", playerName)
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "Join game message sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send join game: ${e.message}")
+            }
+        }
+    }
 }
