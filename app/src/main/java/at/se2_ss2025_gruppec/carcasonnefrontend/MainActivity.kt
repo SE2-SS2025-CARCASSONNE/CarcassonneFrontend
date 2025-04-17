@@ -38,6 +38,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
+import at.se2_ss2025_gruppec.carcasonnefrontend.MainActivity
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
@@ -47,18 +48,31 @@ import org.json.JSONObject
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val stompClient = MyClient(
-            object : Callbacks {
-                override fun onResponse(res: String) {
-                    Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
-                }
-            }
-        )
-        stompClient.connect()
+
         setContent {
             val navController = rememberNavController()
-            NavHost(navController = navController, startDestination = "main") {
-                composable("main") { CarcassonneMainScreen(navController, stompClient) }
+            var userToken by remember { mutableStateOf<String?>(null) } //Remember userToken across recompositions
+
+            val stompClient by remember(userToken) { //Remember stompClient across recompositions, unless userToken changes
+                mutableStateOf(userToken?.let { //Init of stompClient only after authentication (= when userToken not null)
+                    MyClient(object : Callbacks {
+                        override fun onResponse(res: String) {
+                            Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
+                        }
+                    }).apply { connect() }
+                })
+            }
+
+            NavHost(navController = navController, startDestination = "auth") {
+                composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
+                    userToken = jwtToken //Store JWT in state to persist it across recompositions
+                    navController.navigate("main") {
+                        popUpTo("auth") { inclusive = true } //Lock user out of auth screen after authentication
+                    }
+                })}
+                composable("main") { stompClient?.let { //Main screen only accessible after authentication (= when stompClient not null)
+                    MainScreen(navController, it)
+                }}
                 composable("join_game") { JoinGameScreen(navController) }
                 composable("create_game") { CreateGameScreen(navController) }
                 composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
@@ -66,13 +80,15 @@ class MainActivity : ComponentActivity() {
                     val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
                     val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
 
-                    LobbyScreen(
-                        gameId = gameId,
-                        playerName = playerName,
-                        playerCount = playerCount,
-                        stompClient = stompClient,
-                        navController = navController
-                    )
+                    stompClient?.let {
+                        LobbyScreen(
+                            gameId = gameId,
+                            playerName = playerName,
+                            playerCount = playerCount,
+                            stompClient = it,
+                            navController = navController
+                        )
+                    }
                 }
                 composable("gameplay/{gameId}") { backStackEntry ->
                     val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
@@ -84,13 +100,18 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun CarcassonneMainScreen(navController: NavController, stompClient: MyClient) {
+fun AuthScreen(onAuthSuccess: (String) -> Unit) {
+
+}
+
+@Composable
+fun MainScreen(navController: NavController, stompClient: MyClient) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.c_bg),
+            painter = painterResource(id = R.drawable.bg_logo_pxart),
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier
@@ -149,7 +170,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.c_bg),
+            painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier
@@ -283,7 +304,7 @@ fun CreateGameScreen(navController: NavController) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.c_bg),
+            painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier
