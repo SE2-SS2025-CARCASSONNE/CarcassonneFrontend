@@ -38,7 +38,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
-import at.se2_ss2025_gruppec.carcasonnefrontend.MainActivity
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
@@ -101,7 +101,89 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AuthScreen(onAuthSuccess: (String) -> Unit) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isLoading by remember { (mutableStateOf(false)) }
 
+    Box (modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.bg_pxart),
+            contentDescription = null,
+            contentScale = ContentScale.Crop, //Maintains aspect ratio (FillBounds causes warping!)
+            modifier = Modifier
+                .fillMaxSize()
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 240.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                OutlinedTextField( //Username input
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.Gray,
+                        cursorColor = Color.White,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.Gray,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField( //Password input
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.Gray,
+                        cursorColor = Color.White,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.Gray,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                StyledGameButton( //Login button
+                    label = "Login",
+                    onClick = {
+                        isLoading = true
+
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                StyledGameButton( //Register button
+                    label = "Register",
+                    onClick = {
+                        isLoading = true
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                StyledGameButton( //Just for development
+                    label = "Skip (for devs)",
+                    onClick = {
+                        onAuthSuccess("mock-jwt")
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -111,13 +193,11 @@ fun MainScreen(navController: NavController, stompClient: MyClient) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.bg_logo_pxart),
+            painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .offset(y = (-60).dp)
-                .scale(1.13f)
         )
 
         Box(
@@ -172,11 +252,9 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
         Image(
             painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .offset(y = (-60).dp)
-                .scale(1.13f)
         )
 
         Box(
@@ -306,11 +384,9 @@ fun CreateGameScreen(navController: NavController) {
         Image(
             painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .offset(y = (-60).dp)
-                .scale(1.13f)
         )
 
         Box(
@@ -463,7 +539,7 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
         Image(
             painter = painterResource(id = R.drawable.c3_bg),
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
 
