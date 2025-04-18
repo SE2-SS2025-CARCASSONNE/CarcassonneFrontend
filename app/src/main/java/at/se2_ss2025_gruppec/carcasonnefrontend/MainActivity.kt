@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -63,7 +64,10 @@ class MainActivity : ComponentActivity() {
                 })
             }
 
-            NavHost(navController = navController, startDestination = "auth") {
+            NavHost(navController = navController, startDestination = "landing") {
+                composable("landing") { LandingScreen(onStartTapped = {
+                    navController.navigate("auth")
+                })}
                 composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
                     userToken = jwtToken //Store JWT in state to persist it across recompositions
                     navController.navigate("main") {
@@ -100,6 +104,64 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+fun LandingScreen(onStartTapped: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val floating by infiniteTransition.animateFloat( //Define floating animation behavior
+        initialValue = 15f,
+        targetValue = 30f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+    val pulsating by infiniteTransition.animateFloat( //Define pulsating animation behaviour
+        initialValue = 1f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable { onStartTapped() } //Make entire screen clickable (= tap anywhere to continue)
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.bg_pxart),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo_pxart),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(380.dp)
+                    .offset(y = floating.dp), //Apply floating animation to logo
+            )
+
+            Text(
+                text = "tap to play",
+                fontSize = 22.sp,
+                fontFamily = FontFamily.Monospace,
+                color = Color.White,
+                modifier = Modifier
+                    .padding(top = 65.dp)
+                    .scale(pulsating) //Apply pulsating animation to text
+            )
+        }
+    }
+}
+
+@Composable
 fun AuthScreen(onAuthSuccess: (String) -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -112,8 +174,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
             painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
             contentScale = ContentScale.Crop, //Maintains aspect ratio (FillBounds causes warping!)
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         )
 
         Box(
@@ -129,12 +190,13 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                     value = username,
                     onValueChange = { username = it },
                     label = { Text("Username") },
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = Color.White,
                         cursorColor = Color.White,
                         focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.Gray,
+                        unfocusedLabelColor = Color.White,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     )
@@ -145,13 +207,14 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
+                    singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = Color.White,
                         cursorColor = Color.White,
                         focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.Gray,
+                        unfocusedLabelColor = Color.White,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     )
@@ -269,16 +332,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                 OutlinedTextField(
                     value = gameId,
                     onValueChange = { gameId = it },
-                    placeholder = {
-                        Text(
-                            text = "#Enter game ID",
-                            textAlign = TextAlign.Center,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFFFFF4C2),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    },
+                    label = { Text("Enter game ID") },
                     modifier = Modifier.width(220.dp),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(
@@ -289,10 +343,10 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = Color.White,
                         cursorColor = Color.White,
                         focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.Gray,
+                        unfocusedLabelColor = Color.White,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     )
@@ -303,16 +357,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                 OutlinedTextField(
                     value = playerName,
                     onValueChange = { playerName = it },
-                    placeholder = {
-                        Text(
-                            text = "#Enter your name",
-                            textAlign = TextAlign.Center,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFFFFF4C2),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    },
+                    label = { Text("Enter your name") },
                     modifier = Modifier.width(220.dp),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(
@@ -323,10 +368,10 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = Color.White,
                         cursorColor = Color.White,
                         focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.Gray,
+                        unfocusedLabelColor = Color.White,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     )
@@ -402,16 +447,7 @@ fun CreateGameScreen(navController: NavController) {
                 OutlinedTextField(
                     value = playerName,
                     onValueChange = { playerName = it },
-                    placeholder = {
-                        Text(
-                            text = "#Enter your name",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFFFFF4C2),
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
-                    },
+                    label = { Text("Enter your name") },
                     modifier = Modifier.width(220.dp),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(
@@ -422,8 +458,10 @@ fun CreateGameScreen(navController: NavController) {
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = Color.White,
                         cursorColor = Color.White,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.White,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     )
@@ -537,7 +575,7 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.c3_bg),
+            painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
@@ -708,8 +746,16 @@ fun TileView(tile: Tile) {
                 val edge = 10f
 
                 drawRect(color = tile.top, topLeft = Offset(0f, 0f), size = Size(width, edge))
-                drawRect(color = tile.right, topLeft = Offset(width - edge, 0f), size = Size(edge, height))
-                drawRect(color = tile.bottom, topLeft = Offset(0f, height - edge), size = Size(width, edge))
+                drawRect(
+                    color = tile.right,
+                    topLeft = Offset(width - edge, 0f),
+                    size = Size(edge, height)
+                )
+                drawRect(
+                    color = tile.bottom,
+                    topLeft = Offset(0f, height - edge),
+                    size = Size(width, edge)
+                )
                 drawRect(color = tile.left, topLeft = Offset(0f, 0f), size = Size(edge, height))
                 drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
             }
@@ -756,12 +802,22 @@ fun GameplayScreen(gameId: String) {
                                 .padding(2.dp)
                                 .background(Color.DarkGray)
                                 .clickable {
-                                    if (tile == null && canPlaceTile(grid, x, y, currentTile.value)) {
+                                    if (tile == null && canPlaceTile(
+                                            grid,
+                                            x,
+                                            y,
+                                            currentTile.value
+                                        )
+                                    ) {
                                         grid[y][x] = currentTile.value
                                         currentTile.value = generateRandomTile()
                                     } else {
                                         Toast
-                                            .makeText(context, "Can't place tile here", Toast.LENGTH_SHORT)
+                                            .makeText(
+                                                context,
+                                                "Can't place tile here",
+                                                Toast.LENGTH_SHORT
+                                            )
                                             .show()
                                     }
                                 }
