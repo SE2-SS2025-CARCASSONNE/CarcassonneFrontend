@@ -17,7 +17,7 @@ import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks) {
 
-    private  val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game/websocket"
+    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game/websocket" //Use local ip address for real device demo
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job

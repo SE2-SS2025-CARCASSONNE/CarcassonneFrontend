@@ -41,8 +41,8 @@ interface AuthApi {
 
 //Singleton Retrofit client
 object ApiClient {
-    val retrofit: GameApi = Retrofit.Builder()
-        .baseUrl("http://10.0.2.2:8080/")
+    private val retrofit = Retrofit.Builder()
+        .baseUrl("http://10.0.2.2:8080/") //Use local ip address for real device demo
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
