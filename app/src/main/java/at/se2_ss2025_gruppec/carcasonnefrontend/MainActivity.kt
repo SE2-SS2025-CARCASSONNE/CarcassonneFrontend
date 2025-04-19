@@ -40,6 +40,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.authApi
+import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.gameApi
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
@@ -434,7 +436,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 
                         coroutineScope.launch {
                             try {
-                                val gameState = ApiClient.retrofit.getGame(gameId)
+                                val gameState = gameApi.getGame(gameId)
                                 val playerCount = gameState.players.size.coerceAtLeast(2)
                                 navController.navigate("lobby/$gameId/$playerCount/$playerName")
                             } catch (e: Exception) {
@@ -551,7 +553,7 @@ fun CreateGameScreen(navController: NavController) {
 
                         coroutineScope.launch {
                             try {
-                                val response = ApiClient.retrofit.createGame(
+                                val response = gameApi.createGame(
                                     CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
                                 Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
