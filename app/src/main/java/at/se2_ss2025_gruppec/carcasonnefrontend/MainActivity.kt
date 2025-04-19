@@ -66,7 +66,9 @@ class MainActivity : ComponentActivity() {
 
             NavHost(navController = navController, startDestination = "landing") {
                 composable("landing") { LandingScreen(onStartTapped = {
-                    navController.navigate("auth")
+                    navController.navigate("auth") {
+                        popUpTo("landing") { inclusive = true }
+                    }
                 })}
                 composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
                     userToken = jwtToken //Store JWT in state to persist it across recompositions
@@ -169,6 +171,47 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
     var password by remember { mutableStateOf("") }
     var isLoading by remember { (mutableStateOf(false)) }
 
+    fun login(username: String, password: String) {
+        isLoading = true
+
+        coroutineScope.launch {
+            val request = LoginRequest(username, password)
+            try {
+                val response = authApi.login(request) //Store TokenResponse in val response
+                onAuthSuccess(response.token) //Pass actual JWT string to onAuthSuccess
+            } catch (e: retrofit2.HttpException) { //Catch HTTP-specific exceptions
+                val errorBody = e.response()?.errorBody()?.string() //Get raw error body from HTTP response
+                val errorMsg = parseErrorMessage(errorBody) //Parse actual message from error body JSON
+                isLoading = false
+                Toast.makeText(context, "Login failed: $errorMsg", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) { //Catch-all for other exceptions
+                isLoading = false
+                Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun register(username: String, password: String) {
+        isLoading = true
+
+        coroutineScope.launch {
+            val request = RegisterRequest(username, password)
+            try {
+                authApi.register(request) //Success message easier to handle here, no need to store HTTP 201 from backend
+                isLoading = false
+                Toast.makeText(context, "Registration successful!", Toast.LENGTH_SHORT).show()
+            } catch (e: retrofit2.HttpException) {
+                val errorBody = e.response()?.errorBody()?.string()
+                val errorMsg = parseErrorMessage(errorBody)
+                isLoading = false
+                Toast.makeText(context, "Registration failed: $errorMsg", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                isLoading = false
+                Toast.makeText(context, "Registration failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     Box (modifier = Modifier.fillMaxSize()) {
         Image(
             painter = painterResource(id = R.drawable.bg_pxart),
@@ -222,18 +265,21 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                 Spacer(modifier = Modifier.height(24.dp))
 
                 StyledGameButton( //Login button
-                    label = "Login",
+                    label = if (isLoading) "Logging in..." else "Login", //Simple loading indicator
                     onClick = {
-                        isLoading = true
-
+                        if (!isLoading) {
+                            login(username, password)
+                        }
                     }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
                 StyledGameButton( //Register button
-                    label = "Register",
+                    label = if (isLoading) "Registering..." else "Register",
                     onClick = {
-                        isLoading = true
+                        if (!isLoading) {
+                            register(username, password)
+                        }
                     }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -689,6 +735,16 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
                 )
             }
         }
+    }
+}
+
+//Custom parser to parse HTTP error messages returned by backend
+fun parseErrorMessage(body: String?): String {
+    return try {
+        val json = JSONObject(body ?: "")
+        json.getString("message")
+    } catch (_: Exception) {
+        "Unexpected error!"
     }
 }
 

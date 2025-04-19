@@ -41,10 +41,10 @@ class MyClient(val callbacks: Callbacks) {
         scope.launch {
             try {
                 session = client.connect(WEBSOCKET_URI)
-                callback("WebSocket connected")
+                callback("Login successful!")
             } catch (e: Exception) {
                 Log.e("WebSocket", "Connection failed: ${e.message}")
-                callback("Connection failed: ${e.message}")
+                callback("Login failed: ${e.message}")
             }
         }
     }
