@@ -24,10 +24,16 @@ data class TokenResponse(val token: String)
 //Retrofit API interface for game
 interface GameApi {
     @POST("api/game/create")
-    suspend fun createGame(@Body request: CreateGameRequest): CreateGameResponse
+    suspend fun createGame(
+        @Header("Authorization") token: String,
+        @Body request: CreateGameRequest
+    ): CreateGameResponse
 
     @GET("api/game/{gameId}")
-    suspend fun getGame(@Path("gameId") gameId: String): GameStateDTO
+    suspend fun getGame(
+        @Header("Authorization") token: String,
+        @Path("gameId") gameId: String)
+    : GameStateDTO
 }
 
 //Retrofit API interface for auth
