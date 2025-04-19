@@ -77,9 +77,7 @@ class MainActivity : ComponentActivity() {
                         popUpTo("auth") { inclusive = true } //Lock user out of auth screen after authentication
                     }
                 })}
-                composable("main") { stompClient?.let { //Main screen only accessible after authentication (= when stompClient not null)
-                    MainScreen(navController, it)
-                }}
+                composable("main") { MainScreen(navController) }
                 composable("join_game") { JoinGameScreen(navController) }
                 composable("create_game") { CreateGameScreen(navController) }
                 composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
@@ -87,7 +85,7 @@ class MainActivity : ComponentActivity() {
                     val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
                     val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
 
-                    stompClient?.let {
+                    stompClient?.let { //Lobby only accessible when stompClient not null
                         LobbyScreen(
                             gameId = gameId,
                             playerName = playerName,
@@ -179,6 +177,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
             val request = LoginRequest(username, password)
             try {
                 val response = authApi.login(request) //Store TokenResponse in val response
+                TokenManager.userToken = response.token
                 onAuthSuccess(response.token) //Pass actual JWT string to onAuthSuccess
             } catch (e: retrofit2.HttpException) { //Catch HTTP-specific exceptions
                 val errorBody = e.response()?.errorBody()?.string() //Get raw error body from HTTP response
@@ -188,6 +187,8 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
             } catch (e: Exception) { //Catch-all for other exceptions
                 isLoading = false
                 Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoading = false
             }
         }
     }
@@ -297,9 +298,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
 }
 
 @Composable
-fun MainScreen(navController: NavController, stompClient: MyClient) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+fun MainScreen(navController: NavController) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -320,9 +319,6 @@ fun MainScreen(navController: NavController, stompClient: MyClient) {
                 StyledGameButton(
                     label = "Join Game",
                     onClick = {
-                        coroutineScope.launch {
-                            stompClient.connect()
-                        }
                         navController.navigate("join_game")
                     }
                 )
@@ -343,20 +339,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
     var gameId by remember { mutableStateOf("") }
     var playerName by remember { mutableStateOf("") }
-
-    val stompClient = remember {
-        MyClient(object : Callbacks {
-            override fun onResponse(res: String) {
-                Toast.makeText(context, res, Toast.LENGTH_SHORT).show()
-            }
-        })
-    }
-
     val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        stompClient.connect()
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -435,6 +418,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 
                         coroutineScope.launch {
                             try {
+                                //Retrieve token from Singleton and append it to API call
                                 val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
                                 val gameState = gameApi.getGame(
                                     token = "Bearer $token",
@@ -473,7 +457,6 @@ fun CreateGameScreen(navController: NavController) {
     var playerName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -555,6 +538,7 @@ fun CreateGameScreen(navController: NavController) {
 
                         coroutineScope.launch {
                             try {
+                                //Retrieve token from Singleton and append it to API call
                                 val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
                                 val response = gameApi.createGame(
                                     token = "Bearer $token",
