@@ -3,6 +3,7 @@ package at.se2_ss2025_gruppec.carcasonnefrontend.websocket
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import at.se2_ss2025_gruppec.carcasonnefrontend.TokenManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.CoroutineScope
@@ -37,10 +38,16 @@ class MyClient(val callbacks: Callbacks) {
     }
 
     fun connect() {
+        //Retrieve token from Singleton and append it to WebSocket request
+        val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
         client = StompClient(OkHttpWebSocketClient())
+
         scope.launch {
             try {
-                session = client.connect(WEBSOCKET_URI)
+                session = client.connect(
+                    WEBSOCKET_URI,
+                    customStompConnectHeaders = mapOf("Authorization" to "Bearer $token")
+                )
                 callback("Login successful!")
             } catch (e: Exception) {
                 Log.e("WebSocket", "Connection failed: ${e.message}")
