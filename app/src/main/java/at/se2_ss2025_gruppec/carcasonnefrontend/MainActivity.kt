@@ -225,7 +225,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 240.dp),
+                .padding(bottom = 100.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(
@@ -264,9 +264,9 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                         unfocusedTextColor = Color.White
                     )
                 )
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(50.dp))
 
-                StyledGameButton( //Login button
+                PixelArtButton( //Login button
                     label = if (isLoading) "Logging in..." else "Login", //Simple loading indicator
                     onClick = {
                         if (!isLoading) {
@@ -276,7 +276,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                StyledGameButton( //Register button
+                PixelArtButton( //Register button
                     label = if (isLoading) "Registering..." else "Register",
                     onClick = {
                         if (!isLoading) {
@@ -286,7 +286,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                StyledGameButton( //Just for development
+                PixelArtButton( //Just for development
                     label = "Skip (for devs)",
                     onClick = {
                         onAuthSuccess("mock-jwt")
@@ -299,7 +299,6 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
 
 @Composable
 fun MainScreen(navController: NavController, stompClient: MyClient) {
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -318,7 +317,7 @@ fun MainScreen(navController: NavController, stompClient: MyClient) {
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                StyledGameButton(
+                PixelArtButton(
                     label = "Join Game",
                     onClick = {
                         coroutineScope.launch {
@@ -328,7 +327,7 @@ fun MainScreen(navController: NavController, stompClient: MyClient) {
                     }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                StyledGameButton(
+                PixelArtButton(
                     label = "Create Game",
                     onClick = {
                         navController.navigate("create_game")
@@ -425,13 +424,14 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                     )
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(50.dp))
 
-                Button(
+                PixelArtButton(
+                    label = "Join",
                     onClick = {
                         if (gameId.isBlank() || playerName.isBlank()) {
-                            Toast.makeText(context, "Enter both game ID and player name", Toast.LENGTH_SHORT).show()
-                            return@Button
+                            Toast.makeText(context, "Enter game ID and player name", Toast.LENGTH_SHORT).show()
+                            return@PixelArtButton
                         }
 
                         coroutineScope.launch {
@@ -443,23 +443,8 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                                 Toast.makeText(context, "Game not found or connection failed: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .width(130.dp)
-                        .height(45.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xCC5A3A1A)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = "Join",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.5.sp,
-                        color = Color(0xFFFFF4C2)
-                    )
-                }
+                    }
+                )
             }
         }
     }
@@ -471,7 +456,6 @@ fun CreateGameScreen(navController: NavController) {
     var playerName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -543,12 +527,13 @@ fun CreateGameScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Button(
+                PixelArtButton(
+                    label = "Create",
                     onClick = {
                         val hostName = playerName.trim()
                         if (hostName.isEmpty()) {
                             Toast.makeText(context, "Please enter your name", Toast.LENGTH_SHORT).show()
-                            return@Button
+                            return@PixelArtButton
                         }
 
                         coroutineScope.launch {
@@ -562,22 +547,8 @@ fun CreateGameScreen(navController: NavController) {
                                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .width(240.dp)
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xCC5A3A1A)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = "Create Game",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                }
+                    }
+                )
             }
         }
     }
@@ -925,6 +896,37 @@ fun GameplayScreen(gameId: String) {
 }
 
 @Composable
+fun PixelArtButton(
+    label: String,
+    onClick: () -> Unit,
+    backgroundRes: Int = R.drawable.button_pxart
+) {
+    Box(
+        modifier = Modifier
+            .width(240.dp)
+            .height(100.dp)
+            .clickable { onClick() }
+    ) {
+        Image(
+            painter = painterResource(id = backgroundRes),
+            contentDescription = "Pixel button background",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Text(
+            text = label,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.5.sp,
+            color = Color(0xFFFFF4C2),
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+/*
+@Composable
 fun StyledGameButton(
     label: String,
     onClick: () -> Unit
@@ -960,4 +962,4 @@ fun StyledGameButton(
             )
         }
     }
-}
+} */
