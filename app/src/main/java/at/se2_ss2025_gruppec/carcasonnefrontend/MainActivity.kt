@@ -88,9 +88,7 @@ class MainActivity : ComponentActivity() {
                     val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
                     val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
 
-                    val activeClient = GlobalStompClientHolder.client ?: stompClient
-
-                    activeClient?.let {
+                    stompClient?.let {
                         LobbyScreen(
                             gameId = gameId,
                             playerName = playerName,
@@ -428,20 +426,8 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                                 val token = TokenManager.userToken
                                     ?: throw IllegalStateException("Token is required, but was null!")
 
-                                // Create a new WebSocket client for this session
-                                val client = MyClient(object : Callbacks {
-                                    override fun onResponse(res: String) {
-                                        Toast.makeText(context, res, Toast.LENGTH_SHORT).show()
-                                    }
-                                }).apply {
-                                    connect()
-                                }
-
-                                // Store it globally so we can access it in the LobbyScreen
-                                GlobalStompClientHolder.client = client
-
                                 val gameState = gameApi.getGame(
-                                    token = "Bearer $token",
+                                    token = "Bearer $token", // Append JWT to API call
                                     gameId = gameId
                                 )
                                 val playerCount = gameState.players.size.coerceAtLeast(2)
@@ -922,7 +908,7 @@ fun GameplayScreen(gameId: String) {
 fun PixelArtButton(
     label: String,
     onClick: () -> Unit,
-    backgroundRes: Int = R.drawable.bg_pxart
+    backgroundRes: Int = R.drawable.button_pxart
 ) {
     Box(
         modifier = Modifier
@@ -946,9 +932,6 @@ fun PixelArtButton(
             modifier = Modifier.align(Alignment.Center)
         )
     }
-}
-object GlobalStompClientHolder {
-    var client: MyClient? = null
 }
 
 /*

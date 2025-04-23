@@ -19,7 +19,7 @@ import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks) {
 
-    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" //Use local ip address for real device demo
+    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job
@@ -42,7 +42,7 @@ class MyClient(val callbacks: Callbacks) {
         val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
         Log.d("WebSocket", "Attempting WebSocket connection with token: Bearer $token")
 
-        // Custom OkHttpClient that injects the Authorization header
+        // Custom OkHttpClient that attaches JWT to auth header of HTTP upgrade request
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
