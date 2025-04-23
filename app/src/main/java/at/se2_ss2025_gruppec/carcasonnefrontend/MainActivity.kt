@@ -54,10 +54,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val navController = rememberNavController()
-            var userToken by remember { mutableStateOf<String?>(null) } //Remember userToken across recompositions
+            var userToken by remember { mutableStateOf(TokenManager.userToken) }
 
             val stompClient by remember(userToken) { //Remember stompClient across recompositions, unless userToken changes
-                mutableStateOf(userToken?.let { //Init of stompClient only after authentication (= when userToken not null)
+                mutableStateOf(TokenManager.userToken?.let { //Init of stompClient only after authentication (= when userToken not null)
                     MyClient(object : Callbacks {
                         override fun onResponse(res: String) {
                             Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
@@ -73,22 +73,22 @@ class MainActivity : ComponentActivity() {
                     }
                 })}
                 composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
-                    userToken = jwtToken //Store JWT in state to persist it across recompositions
+                    TokenManager.userToken = jwtToken //Store JWT in Singleton for persistence and easy access
+                    userToken = jwtToken //Triggers recomposition to init stompClient
                     navController.navigate("main") {
                         popUpTo("auth") { inclusive = true } //Lock user out of auth screen after authentication
                     }
                 })}
-                composable("main") { stompClient?.let { //Main screen only accessible after authentication (= when stompClient not null)
-                    MainScreen(navController, it)
-                }}
+                composable("main") { MainScreen(navController) }
                 composable("join_game") { JoinGameScreen(navController) }
                 composable("create_game") { CreateGameScreen(navController) }
+
                 composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
                     val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
                     val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
                     val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
 
-                    stompClient?.let {
+                    stompClient?.let { //Lobby only accessible when stompClient not null
                         LobbyScreen(
                             gameId = gameId,
                             playerName = playerName,
@@ -180,6 +180,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
             val request = LoginRequest(username, password)
             try {
                 val response = authApi.login(request) //Store TokenResponse in val response
+                TokenManager.userToken = response.token
                 onAuthSuccess(response.token) //Pass actual JWT string to onAuthSuccess
             } catch (e: retrofit2.HttpException) { //Catch HTTP-specific exceptions
                 val errorBody = e.response()?.errorBody()?.string() //Get raw error body from HTTP response
@@ -189,6 +190,8 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
             } catch (e: Exception) { //Catch-all for other exceptions
                 isLoading = false
                 Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoading = false
             }
         }
     }
@@ -298,9 +301,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
 }
 
 @Composable
-fun MainScreen(navController: NavController, stompClient: MyClient) {
-    val coroutineScope = rememberCoroutineScope()
-
+fun MainScreen(navController: NavController) {
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
             painter = painterResource(id = R.drawable.bg_pxart),
@@ -320,9 +321,6 @@ fun MainScreen(navController: NavController, stompClient: MyClient) {
                 PixelArtButton(
                     label = "Join Game",
                     onClick = {
-                        coroutineScope.launch {
-                            stompClient.connect()
-                        }
                         navController.navigate("join_game")
                     }
                 )
@@ -343,20 +341,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
     var gameId by remember { mutableStateOf("") }
     var playerName by remember { mutableStateOf("") }
-
-    val stompClient = remember {
-        MyClient(object : Callbacks {
-            override fun onResponse(res: String) {
-                Toast.makeText(context, res, Toast.LENGTH_SHORT).show()
-            }
-        })
-    }
-
     val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        stompClient.connect()
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -436,7 +421,11 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 
                         coroutineScope.launch {
                             try {
-                                val gameState = gameApi.getGame(gameId)
+                                //Retrieve token from Singleton and append it to API call
+                                val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
+                                val gameState = gameApi.getGame(
+                                    token = "Bearer $token",
+                                    gameId = gameId)
                                 val playerCount = gameState.players.size.coerceAtLeast(2)
                                 navController.navigate("lobby/$gameId/$playerCount/$playerName")
                             } catch (e: Exception) {
@@ -475,7 +464,7 @@ fun CreateGameScreen(navController: NavController) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 👉 NAME FIELD
+                //Name input field
                 OutlinedTextField(
                     value = playerName,
                     onValueChange = { playerName = it },
@@ -538,11 +527,15 @@ fun CreateGameScreen(navController: NavController) {
 
                         coroutineScope.launch {
                             try {
+                                //Retrieve token from Singleton and append it to API call
+                                val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
                                 val response = gameApi.createGame(
-                                    CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
+                                    token = "Bearer $token",
+                                    request = CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
                                 Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
                                 navController.navigate("lobby/${response.gameId}/$selectedPlayers/$hostName")
+
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
@@ -709,6 +702,11 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
             }
         }
     }
+}
+
+//Singleton TokenManager to store JWT
+object TokenManager {
+    var userToken: String? = null
 }
 
 //Custom parser to parse HTTP error messages returned by backend

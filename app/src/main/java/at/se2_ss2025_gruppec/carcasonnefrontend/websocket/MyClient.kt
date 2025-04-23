@@ -3,6 +3,7 @@ package at.se2_ss2025_gruppec.carcasonnefrontend.websocket
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import at.se2_ss2025_gruppec.carcasonnefrontend.TokenManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.CoroutineScope
@@ -10,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.StompSession
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import org.hildan.krossbow.stomp.sendText
 import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
@@ -17,7 +19,7 @@ import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks) {
 
-    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game/websocket" //Use local ip address for real device demo
+    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" //Use local ip address for real device demo
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job
@@ -37,10 +39,27 @@ class MyClient(val callbacks: Callbacks) {
     }
 
     fun connect() {
-        client = StompClient(OkHttpWebSocketClient())
+        //Retrieve token from Singleton and append it to WebSocket request
+        val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
+
+        //Custom OkHttpClient attaching JWT to auth header during WS handshake (needed for JwtHandshakeInterceptor!)
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("Authorization", "Bearer $token").build()
+                chain.proceed(request)
+            }
+            .build()
+
+        //STOMP client using custom OkHttpClient
+        client = StompClient(OkHttpWebSocketClient(okHttpClient))
+
         scope.launch {
             try {
-                session = client.connect(WEBSOCKET_URI)
+                session = client.connect( //Initiates WebSocket handshake
+                    WEBSOCKET_URI,
+                    customStompConnectHeaders = mapOf("Authorization" to "Bearer $token")
+                )
                 callback("Login successful!")
             } catch (e: Exception) {
                 Log.e("WebSocket", "Connection failed: ${e.message}")
