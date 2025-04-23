@@ -54,8 +54,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val navController = rememberNavController()
+            var userToken by remember { mutableStateOf(TokenManager.userToken) }
 
-            val stompClient by remember(TokenManager.userToken) { //Remember stompClient across recompositions, unless userToken changes
+            val stompClient by remember(userToken) { //Remember stompClient across recompositions, unless userToken changes
                 mutableStateOf(TokenManager.userToken?.let { //Init of stompClient only after authentication (= when userToken not null)
                     MyClient(object : Callbacks {
                         override fun onResponse(res: String) {
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
                 })}
                 composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
                     TokenManager.userToken = jwtToken //Store JWT in Singleton for persistence and easy access
+                    userToken = jwtToken //Triggers recomposition to init stompClient
                     navController.navigate("main") {
                         popUpTo("auth") { inclusive = true } //Lock user out of auth screen after authentication
                     }
@@ -80,6 +82,7 @@ class MainActivity : ComponentActivity() {
                 composable("main") { MainScreen(navController) }
                 composable("join_game") { JoinGameScreen(navController) }
                 composable("create_game") { CreateGameScreen(navController) }
+
                 composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
                     val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
                     val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
@@ -476,7 +479,7 @@ fun CreateGameScreen(navController: NavController) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 👉 NAME FIELD
+                //Name input field
                 OutlinedTextField(
                     value = playerName,
                     onValueChange = { playerName = it },
@@ -546,6 +549,7 @@ fun CreateGameScreen(navController: NavController) {
                                 )
                                 Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
                                 navController.navigate("lobby/${response.gameId}/$selectedPlayers/$hostName")
+
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
