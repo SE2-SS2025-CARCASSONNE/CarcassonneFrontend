@@ -39,30 +39,34 @@ class MyClient(val callbacks: Callbacks) {
     }
 
     fun connect() {
-        //Retrieve token from Singleton and append it to WebSocket request
         val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
+        Log.d("WebSocket", "Attempting WebSocket connection with token: Bearer $token")
 
-        //Custom OkHttpClient attaching JWT to auth header during WS handshake (needed for JwtHandshakeInterceptor!)
+        // Custom OkHttpClient that injects the Authorization header
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $token").build()
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+                Log.d("WebSocket", "Adding Authorization header to handshake: ${request.headers}")
                 chain.proceed(request)
             }
             .build()
 
-        //STOMP client using custom OkHttpClient
+        // Create STOMP client with the custom OkHttpClient
         client = StompClient(OkHttpWebSocketClient(okHttpClient))
 
+        // Launch connection in coroutine
         scope.launch {
             try {
-                session = client.connect( //Initiates WebSocket handshake
+                session = client.connect(
                     WEBSOCKET_URI,
                     customStompConnectHeaders = mapOf("Authorization" to "Bearer $token")
                 )
+                Log.d("WebSocket", "WebSocket connection established!")
                 callback("Login successful!")
             } catch (e: Exception) {
-                Log.e("WebSocket", "Connection failed: ${e.message}")
+                Log.e("WebSocket", "WebSocket connection failed: ${e.message}")
                 callback("Login failed: ${e.message}")
             }
         }

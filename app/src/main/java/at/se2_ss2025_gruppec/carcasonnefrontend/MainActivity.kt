@@ -88,7 +88,9 @@ class MainActivity : ComponentActivity() {
                     val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
                     val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
 
-                    stompClient?.let { //Lobby only accessible when stompClient not null
+                    val activeClient = GlobalStompClientHolder.client ?: stompClient
+
+                    activeClient?.let {
                         LobbyScreen(
                             gameId = gameId,
                             playerName = playerName,
@@ -96,6 +98,9 @@ class MainActivity : ComponentActivity() {
                             stompClient = it,
                             navController = navController
                         )
+                    } ?: run {
+                        Log.e("MainActivity", "No stomp client available to show lobby")
+                        Toast.makeText(this@MainActivity, "Connection not ready!", Toast.LENGTH_SHORT).show()
                     }
                 }
                 composable("gameplay/{gameId}") { backStackEntry ->
@@ -348,8 +353,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
             painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         )
 
         Box(
@@ -421,14 +425,30 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 
                         coroutineScope.launch {
                             try {
-                                //Retrieve token from Singleton and append it to API call
-                                val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
+                                val token = TokenManager.userToken
+                                    ?: throw IllegalStateException("Token is required, but was null!")
+
+                                // Create a new WebSocket client for this session
+                                val client = MyClient(object : Callbacks {
+                                    override fun onResponse(res: String) {
+                                        Toast.makeText(context, res, Toast.LENGTH_SHORT).show()
+                                    }
+                                }).apply {
+                                    connect()
+                                }
+
+                                // Store it globally so we can access it in the LobbyScreen
+                                GlobalStompClientHolder.client = client
+
                                 val gameState = gameApi.getGame(
                                     token = "Bearer $token",
-                                    gameId = gameId)
+                                    gameId = gameId
+                                )
                                 val playerCount = gameState.players.size.coerceAtLeast(2)
+
                                 navController.navigate("lobby/$gameId/$playerCount/$playerName")
                             } catch (e: Exception) {
+                                Log.e("JoinGame", "Exception during getGame: ${e.message}", e)
                                 Toast.makeText(context, "Game not found or connection failed: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         }
@@ -557,8 +577,13 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
         while (!stompClient.isConnected()) {
             delay(100)
         }
-        stompClient.sendJoinGame(gameId, playerName)
-
+        try {
+            Log.d("LobbyScreen", "Sending join_game for $playerName to $gameId")
+            stompClient.sendJoinGame(gameId, playerName)
+        } catch (e: Exception) {
+            Log.e("LobbyScreen", "Failed to send join_game: ${e.message}")
+            Toast.makeText(context, "Failed to join game: ${e.message}", Toast.LENGTH_LONG).show()
+        }
         stompClient.listenOn("/topic/game/$gameId") { message ->
             Log.d("WebSocket", "Received message: $message")
             val json = JSONObject(message)
@@ -897,7 +922,7 @@ fun GameplayScreen(gameId: String) {
 fun PixelArtButton(
     label: String,
     onClick: () -> Unit,
-    backgroundRes: Int = R.drawable.button_pxart
+    backgroundRes: Int = R.drawable.bg_pxart
 ) {
     Box(
         modifier = Modifier
@@ -921,6 +946,9 @@ fun PixelArtButton(
             modifier = Modifier.align(Alignment.Center)
         )
     }
+}
+object GlobalStompClientHolder {
+    var client: MyClient? = null
 }
 
 /*

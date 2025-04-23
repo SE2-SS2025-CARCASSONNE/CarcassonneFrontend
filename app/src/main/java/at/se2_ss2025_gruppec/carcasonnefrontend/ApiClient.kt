@@ -8,9 +8,18 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 
+// Updated to match backend Player model
+data class PlayerDTO(
+    val id: String,
+    val score: Int,
+    val meeplesLeft: Int,
+    val pointsThisTurn: Int
+)
+
+// Updated to use PlayerDTO instead of List<String>
 data class GameStateDTO(
     val gameId: String,
-    val players: List<String>,
+    val players: List<PlayerDTO>,
     val status: String,
     val currentPlayerIndex: Int
 )
@@ -22,7 +31,7 @@ data class LoginRequest(val username: String, val password: String)
 data class RegisterRequest(val username: String, val password: String)
 data class TokenResponse(val token: String)
 
-//Retrofit API interface for game
+// Retrofit API interface for game
 interface GameApi {
     @POST("api/game/create")
     suspend fun createGame(
@@ -33,23 +42,23 @@ interface GameApi {
     @GET("api/game/{gameId}")
     suspend fun getGame(
         @Header("Authorization") token: String,
-        @Path("gameId") gameId: String)
-    : GameStateDTO
+        @Path("gameId") gameId: String
+    ): GameStateDTO
 }
 
-//Retrofit API interface for auth
+// Retrofit API interface for auth
 interface AuthApi {
     @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): TokenResponse
 
     @POST("api/auth/register")
-    suspend fun register(@Body request: RegisterRequest) //No need to get HTTP 201 from backend, if needed: create data class MessageResponse and set as return type
+    suspend fun register(@Body request: RegisterRequest)
 }
 
-//Singleton Retrofit client
+// Singleton Retrofit client
 object ApiClient {
     private val retrofit = Retrofit.Builder()
-        .baseUrl("http://10.0.2.2:8080/") //Use local ip address for real device demo
+        .baseUrl("http://10.0.2.2:8080/") // Use local IP for emulator
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
