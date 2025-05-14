@@ -3,6 +3,7 @@ package at.se2_ss2025_gruppec.carcasonnefrontend.websocket
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import at.se2_ss2025_gruppec.carcasonnefrontend.TokenManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.CoroutineScope
@@ -10,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.StompSession
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import org.hildan.krossbow.stomp.sendText
 import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
@@ -17,7 +19,7 @@ import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks) {
 
-    private  val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game/websocket"
+    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job
@@ -37,14 +39,35 @@ class MyClient(val callbacks: Callbacks) {
     }
 
     fun connect() {
-        client = StompClient(OkHttpWebSocketClient())
+        val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
+        Log.d("WebSocket", "Attempting WebSocket connection with token: Bearer $token")
+
+        // Custom OkHttpClient that attaches JWT to auth header of HTTP upgrade request
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+                Log.d("WebSocket", "Adding Authorization header to handshake: ${request.headers}")
+                chain.proceed(request)
+            }
+            .build()
+
+        // Create STOMP client with the custom OkHttpClient
+        client = StompClient(OkHttpWebSocketClient(okHttpClient))
+
+        // Launch connection in coroutine
         scope.launch {
             try {
-                session = client.connect(WEBSOCKET_URI)
-                callback("WebSocket connected")
+                session = client.connect(
+                    WEBSOCKET_URI,
+                    customStompConnectHeaders = mapOf("Authorization" to "Bearer $token")
+                )
+                Log.d("WebSocket", "WebSocket connection established!")
+                callback("Login successful!")
             } catch (e: Exception) {
-                Log.e("WebSocket", "Connection failed: ${e.message}")
-                callback("Connection failed: ${e.message}")
+                Log.e("WebSocket", "WebSocket connection failed: ${e.message}")
+                callback("Login failed: ${e.message}")
             }
         }
     }
@@ -114,5 +137,21 @@ class MyClient(val callbacks: Callbacks) {
     }
     fun isConnected(): Boolean {
         return session != null
+    }
+    fun sendJoinGame(gameId: String, playerName: String) {
+        val json = JSONObject().apply {
+            put("type", "join_game")
+            put("gameId", gameId)
+            put("player", playerName)
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "Join game message sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send join game: ${e.message}")
+            }
+        }
     }
 }

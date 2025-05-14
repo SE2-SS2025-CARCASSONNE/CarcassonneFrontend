@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +39,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.authApi
+import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.gameApi
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
@@ -47,29 +51,55 @@ import org.json.JSONObject
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val stompClient = MyClient(
-            object : Callbacks {
-                override fun onResponse(res: String) {
-                    Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
-                }
-            }
-        )
-        stompClient.connect()
+
         setContent {
             val navController = rememberNavController()
-            NavHost(navController = navController, startDestination = "main") {
-                composable("main") { CarcassonneMainScreen(navController, stompClient) }
-                composable("join_game") { JoinGameScreen() }
+            var userToken by remember { mutableStateOf(TokenManager.userToken) }
+
+            val stompClient by remember(userToken) { //Remember stompClient across recompositions, unless userToken changes
+                mutableStateOf(TokenManager.userToken?.let { //Init of stompClient only after authentication (= when userToken not null)
+                    MyClient(object : Callbacks {
+                        override fun onResponse(res: String) {
+                            Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
+                        }
+                    }).apply { connect() }
+                })
+            }
+
+            NavHost(navController = navController, startDestination = "landing") {
+                composable("landing") { LandingScreen(onStartTapped = {
+                    navController.navigate("auth") {
+                        popUpTo("landing") { inclusive = true }
+                    }
+                })}
+                composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
+                    TokenManager.userToken = jwtToken //Store JWT in Singleton for persistence and easy access
+                    userToken = jwtToken //Triggers recomposition to init stompClient
+                    navController.navigate("main") {
+                        popUpTo("auth") { inclusive = true } //Lock user out of auth screen after authentication
+                    }
+                })}
+                composable("main") { MainScreen(navController) }
+                composable("join_game") { JoinGameScreen(navController) }
                 composable("create_game") { CreateGameScreen(navController) }
-                composable("lobby/{gameId}/{playerCount}") { backStackEntry ->
+
+                composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
                     val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
                     val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
-                    LobbyScreen(
-                        gameId = gameId,
-                        playerCount = playerCount,
-                        stompClient = stompClient,
-                        navController = navController
-                    )
+                    val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
+
+                    stompClient?.let {
+                        LobbyScreen(
+                            gameId = gameId,
+                            playerName = playerName,
+                            playerCount = playerCount,
+                            stompClient = it,
+                            navController = navController
+                        )
+                    } ?: run {
+                        Log.e("MainActivity", "No stomp client available to show lobby")
+                        Toast.makeText(this@MainActivity, "Connection not ready!", Toast.LENGTH_SHORT).show()
+                    }
                 }
                 composable("gameplay/{gameId}") { backStackEntry ->
                     val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
@@ -81,19 +111,207 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun CarcassonneMainScreen(navController: NavController, stompClient: MyClient) {
+fun LandingScreen(onStartTapped: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val floating by infiniteTransition.animateFloat( //Define floating animation behavior
+        initialValue = 15f,
+        targetValue = 30f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+    val pulsating by infiniteTransition.animateFloat( //Define pulsating animation behaviour
+        initialValue = 1f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable { onStartTapped() } //Make entire screen clickable (= tap anywhere to continue)
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.bg_pxart),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo_pxart),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(380.dp)
+                    .offset(y = floating.dp), //Apply floating animation to logo
+            )
+
+            Text(
+                text = "tap to play",
+                fontSize = 22.sp,
+                fontFamily = FontFamily.Monospace,
+                color = Color.White,
+                modifier = Modifier
+                    .padding(top = 65.dp)
+                    .scale(pulsating) //Apply pulsating animation to text
+            )
+        }
+    }
+}
+
+@Composable
+fun AuthScreen(onAuthSuccess: (String) -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isLoading by remember { (mutableStateOf(false)) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    fun login(username: String, password: String) {
+        isLoading = true
+
+        coroutineScope.launch {
+            val request = LoginRequest(username, password)
+            try {
+                val response = authApi.login(request) //Store TokenResponse in val response
+                TokenManager.userToken = response.token
+                onAuthSuccess(response.token) //Pass actual JWT string to onAuthSuccess
+            } catch (e: retrofit2.HttpException) { //Catch HTTP-specific exceptions
+                val errorBody = e.response()?.errorBody()?.string() //Get raw error body from HTTP response
+                val errorMsg = parseErrorMessage(errorBody) //Parse actual message from error body JSON
+                isLoading = false
+                Toast.makeText(context, "Login failed: $errorMsg", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) { //Catch-all for other exceptions
+                isLoading = false
+                Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun register(username: String, password: String) {
+        isLoading = true
+
+        coroutineScope.launch {
+            val request = RegisterRequest(username, password)
+            try {
+                authApi.register(request) //Success message easier to handle here, no need to store HTTP 201 from backend
+                isLoading = false
+                Toast.makeText(context, "Registration successful!", Toast.LENGTH_SHORT).show()
+            } catch (e: retrofit2.HttpException) {
+                val errorBody = e.response()?.errorBody()?.string()
+                val errorMsg = parseErrorMessage(errorBody)
+                isLoading = false
+                Toast.makeText(context, "Registration failed: $errorMsg", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                isLoading = false
+                Toast.makeText(context, "Registration failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    Box (modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.c_bg),
+            painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop, //Maintains aspect ratio (FillBounds causes warping!)
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .offset(y = (-60).dp)
-                .scale(1.13f)
+                .padding(bottom = 100.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                OutlinedTextField( //Username input
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.White,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField( //Password input
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.White,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+                Spacer(modifier = Modifier.height(50.dp))
+
+                PixelArtButton( //Login button
+                    label = if (isLoading) "Logging in..." else "Login", //Simple loading indicator
+                    onClick = {
+                        if (!isLoading) {
+                            login(username, password)
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                PixelArtButton( //Register button
+                    label = if (isLoading) "Registering..." else "Register",
+                    onClick = {
+                        if (!isLoading) {
+                            register(username, password)
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                PixelArtButton( //Just for development
+                    label = "Skip (for devs)",
+                    onClick = {
+                        onAuthSuccess("mock-jwt")
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MainScreen(navController: NavController) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.bg_pxart),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
         )
 
         Box(
@@ -103,17 +321,14 @@ fun CarcassonneMainScreen(navController: NavController, stompClient: MyClient) {
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                StyledGameButton(
+                PixelArtButton(
                     label = "Join Game",
                     onClick = {
-                        coroutineScope.launch {
-                            stompClient.connect()
-                        }
                         navController.navigate("join_game")
                     }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                StyledGameButton(
+                PixelArtButton(
                     label = "Create Game",
                     onClick = {
                         navController.navigate("create_game")
@@ -125,18 +340,18 @@ fun CarcassonneMainScreen(navController: NavController, stompClient: MyClient) {
 }
 
 @Composable
-fun JoinGameScreen() {
+fun JoinGameScreen(navController: NavController = rememberNavController()) {
+    val context = LocalContext.current
     var gameId by remember { mutableStateOf("") }
+    var playerName by remember { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.c_bg),
+            painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .fillMaxSize()
-                .offset(y = (-60).dp)
-                .scale(1.13f)
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
         )
 
         Box(
@@ -151,17 +366,8 @@ fun JoinGameScreen() {
                 OutlinedTextField(
                     value = gameId,
                     onValueChange = { gameId = it },
-                    placeholder = {
-                        Text(
-                            text = "#Enter game ID",
-                            textAlign = TextAlign.Center,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFFFFF4C2),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    },
-                    modifier = Modifier.width(207.dp),
+                    label = { Text("Enter game ID") },
+                    modifier = Modifier.width(220.dp),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(
                         fontSize = 22.sp,
@@ -171,37 +377,69 @@ fun JoinGameScreen() {
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = Color.White,
                         cursorColor = Color.White,
                         focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.Gray,
+                        unfocusedLabelColor = Color.White,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     )
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                Button(
-                    onClick = {
-                        // TODO: Join with gameId
-                    },
-                    modifier = Modifier
-                        .width(130.dp)
-                        .height(45.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xCC5A3A1A)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = "Join",
-                        fontSize = 20.sp,
+                OutlinedTextField(
+                    value = playerName,
+                    onValueChange = { playerName = it },
+                    label = { Text("Enter your name") },
+                    modifier = Modifier.width(220.dp),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.5.sp,
-                        color = Color(0xFFFFF4C2)
+                        color = Color(0xFFFFF4C2),
+                        textAlign = TextAlign.Center
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.White,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
                     )
-                }
+                )
+
+                Spacer(modifier = Modifier.height(50.dp))
+
+                PixelArtButton(
+                    label = "Join",
+                    onClick = {
+                        if (gameId.isBlank() || playerName.isBlank()) {
+                            Toast.makeText(context, "Enter game ID and player name", Toast.LENGTH_SHORT).show()
+                            return@PixelArtButton
+                        }
+
+                        coroutineScope.launch {
+                            try {
+                                val token = TokenManager.userToken
+                                    ?: throw IllegalStateException("Token is required, but was null!")
+
+                                val gameState = gameApi.getGame(
+                                    token = "Bearer $token", // Append JWT to API call
+                                    gameId = gameId
+                                )
+                                val playerCount = gameState.players.size.coerceAtLeast(2)
+
+                                navController.navigate("lobby/$gameId/$playerCount/$playerName")
+                            } catch (e: Exception) {
+                                Log.e("JoinGame", "Exception during getGame: ${e.message}", e)
+                                Toast.makeText(context, "Game not found or connection failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                )
             }
         }
     }
@@ -210,18 +448,17 @@ fun JoinGameScreen() {
 @Composable
 fun CreateGameScreen(navController: NavController) {
     var selectedPlayers by remember { mutableStateOf(2) }
+    var playerName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.c_bg),
+            painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .offset(y = (-60).dp)
-                .scale(1.13f)
         )
 
         Box(
@@ -231,6 +468,32 @@ fun CreateGameScreen(navController: NavController) {
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(modifier = Modifier.height(24.dp))
+
+                //Name input field
+                OutlinedTextField(
+                    value = playerName,
+                    onValueChange = { playerName = it },
+                    label = { Text("Enter your name") },
+                    modifier = Modifier.width(220.dp),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFFF4C2),
+                        textAlign = TextAlign.Center
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.White,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
@@ -259,73 +522,85 @@ fun CreateGameScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                val clipboardManager = LocalClipboardManager.current
-
-                Button(
+                PixelArtButton(
+                    label = "Create",
                     onClick = {
+                        val hostName = playerName.trim()
+                        if (hostName.isEmpty()) {
+                            Toast.makeText(context, "Please enter your name", Toast.LENGTH_SHORT).show()
+                            return@PixelArtButton
+                        }
+
                         coroutineScope.launch {
                             try {
-                                val response = ApiClient.retrofit.createGame(
-                                    CreateGameRequest(playerCount = selectedPlayers)
+                                //Retrieve token from Singleton and append it to API call
+                                val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
+                                val response = gameApi.createGame(
+                                    token = "Bearer $token",
+                                    request = CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
                                 Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
-                                navController.navigate("lobby/${response.gameId}/$selectedPlayers")
+                                navController.navigate("lobby/${response.gameId}/$selectedPlayers/$hostName")
+
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .width(240.dp)
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xCC5A3A1A)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = "Create Game",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                }
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: Int = 2, stompClient: MyClient, navController: NavController) {
-    val players = remember { mutableStateListOf(hostName) }
+fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompClient: MyClient, navController: NavController) {
+    val players = remember { mutableStateListOf(playerName) }
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+
     LaunchedEffect(Unit) {
         while (!stompClient.isConnected()) {
             delay(100)
         }
-
+        try {
+            Log.d("LobbyScreen", "Sending join_game for $playerName to $gameId")
+            stompClient.sendJoinGame(gameId, playerName)
+        } catch (e: Exception) {
+            Log.e("LobbyScreen", "Failed to send join_game: ${e.message}")
+            Toast.makeText(context, "Failed to join game: ${e.message}", Toast.LENGTH_LONG).show()
+        }
         stompClient.listenOn("/topic/game/$gameId") { message ->
             Log.d("WebSocket", "Received message: $message")
             val json = JSONObject(message)
-            if (json.getString("type") == "game_started") {
-                Log.d("WebSocket", "Navigating to gameplay screen")
-                Handler(Looper.getMainLooper()).post {
-                    navController.navigate("gameplay/$gameId")
+            when (json.getString("type")) {
+                "game_started" -> {
+                    Handler(Looper.getMainLooper()).post {
+                        navController.navigate("gameplay/$gameId")
+                    }
+                }
+                "player_joined" -> {
+                    val playerArray = json.getJSONArray("players")
+                    Handler(Looper.getMainLooper()).post {
+                        players.clear()
+                        for (i in 0 until playerArray.length()) {
+                            players.add(playerArray.getString(i))
+                        }
+                        Log.d("Lobby", "Updated players in lobby: $players")
+                    }
                 }
             }
         }
     }
-
 
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.c3_bg),
+            painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -350,10 +625,7 @@ fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: In
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .border(2.dp, Color(0xFFFFF4C2), RoundedCornerShape(12.dp))
@@ -393,7 +665,9 @@ fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: In
             Spacer(modifier = Modifier.height(24.dp))
 
             for (i in 1..playerCount) {
-                val playerName = players.getOrNull(i - 1) ?: "Empty Slot"
+                val playerNameInList = players.getOrNull(i - 1) ?: "Empty Slot"
+                Log.d("LobbyScreen", "Checking: [$playerNameInList] vs [$playerName]")
+                val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
 
                 Button(
                     onClick = { },
@@ -410,18 +684,19 @@ fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: In
                     )
                 ) {
                     Text(
-                        text = playerName,
+                        text = displayName,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
             }
+
             Spacer(modifier = Modifier.height(68.dp))
-            //Check if (players.size == playerCount) to show the button currently disabled for developing purposes.
+
             Button(
                 onClick = {
                     Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
-                    stompClient.sendStartGame(gameId);
+                    stompClient.sendStartGame(gameId)
                 },
                 modifier = Modifier
                     .width(200.dp)
@@ -437,6 +712,21 @@ fun LobbyScreen(gameId: String, hostName: String = "You (Host)", playerCount: In
                 )
             }
         }
+    }
+}
+
+//Singleton TokenManager to store JWT
+object TokenManager {
+    var userToken: String? = null
+}
+
+//Custom parser to parse HTTP error messages returned by backend
+fun parseErrorMessage(body: String?): String {
+    return try {
+        val json = JSONObject(body ?: "")
+        json.getString("message")
+    } catch (_: Exception) {
+        "Unexpected error!"
     }
 }
 
@@ -494,8 +784,16 @@ fun TileView(tile: Tile) {
                 val edge = 10f
 
                 drawRect(color = tile.top, topLeft = Offset(0f, 0f), size = Size(width, edge))
-                drawRect(color = tile.right, topLeft = Offset(width - edge, 0f), size = Size(edge, height))
-                drawRect(color = tile.bottom, topLeft = Offset(0f, height - edge), size = Size(width, edge))
+                drawRect(
+                    color = tile.right,
+                    topLeft = Offset(width - edge, 0f),
+                    size = Size(edge, height)
+                )
+                drawRect(
+                    color = tile.bottom,
+                    topLeft = Offset(0f, height - edge),
+                    size = Size(width, edge)
+                )
                 drawRect(color = tile.left, topLeft = Offset(0f, 0f), size = Size(edge, height))
                 drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
             }
@@ -542,12 +840,22 @@ fun GameplayScreen(gameId: String) {
                                 .padding(2.dp)
                                 .background(Color.DarkGray)
                                 .clickable {
-                                    if (tile == null && canPlaceTile(grid, x, y, currentTile.value)) {
+                                    if (tile == null && canPlaceTile(
+                                            grid,
+                                            x,
+                                            y,
+                                            currentTile.value
+                                        )
+                                    ) {
                                         grid[y][x] = currentTile.value
                                         currentTile.value = generateRandomTile()
                                     } else {
                                         Toast
-                                            .makeText(context, "Can't place tile here", Toast.LENGTH_SHORT)
+                                            .makeText(
+                                                context,
+                                                "Can't place tile here",
+                                                Toast.LENGTH_SHORT
+                                            )
                                             .show()
                                     }
                                 }
@@ -597,6 +905,37 @@ fun GameplayScreen(gameId: String) {
 }
 
 @Composable
+fun PixelArtButton(
+    label: String,
+    onClick: () -> Unit,
+    backgroundRes: Int = R.drawable.button_pxart
+) {
+    Box(
+        modifier = Modifier
+            .width(240.dp)
+            .height(100.dp)
+            .clickable { onClick() }
+    ) {
+        Image(
+            painter = painterResource(id = backgroundRes),
+            contentDescription = "Pixel button background",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Text(
+            text = label,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.5.sp,
+            color = Color(0xFFFFF4C2),
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+/*
+@Composable
 fun StyledGameButton(
     label: String,
     onClick: () -> Unit
@@ -632,4 +971,4 @@ fun StyledGameButton(
             )
         }
     }
-}
+} */
