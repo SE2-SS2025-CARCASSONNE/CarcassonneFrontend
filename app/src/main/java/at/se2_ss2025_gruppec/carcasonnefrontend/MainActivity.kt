@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.delay
 import org.json.JSONObject
+import androidx.compose.ui.tooling.preview.Preview
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -715,90 +717,113 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
     }
 }
 
-//Singleton TokenManager to store JWT
-object TokenManager {
-    var userToken: String? = null
-}
-
-//Custom parser to parse HTTP error messages returned by backend
-fun parseErrorMessage(body: String?): String {
-    return try {
-        val json = JSONObject(body ?: "")
-        json.getString("message")
-    } catch (_: Exception) {
-        "Unexpected error!"
-    }
-}
-
-data class Tile(
-    val top: Color,
-    val right: Color,
-    val bottom: Color,
-    val left: Color
-) {
-    fun rotated(): Tile {
-        return Tile(
-            top = left,
-            right = top,
-            bottom = right,
-            left = bottom
-        )
-    }
-}
-
-fun generateRandomTile(): Tile {
-    val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow)
-    return Tile(
-        top = colors.random(),
-        right = colors.random(),
-        bottom = colors.random(),
-        left = colors.random()
-    )
-}
-
-fun canPlaceTile(
-    grid: List<List<Tile?>>, x: Int, y: Int, tile: Tile
-): Boolean {
-    val top = if (y > 0) grid[y - 1][x] else null
-    val bottom = if (y < grid.size - 1) grid[y + 1][x] else null
-    val left = if (x > 0) grid[y][x - 1] else null
-    val right = if (x < grid[y].size - 1) grid[y][x + 1] else null
-
-    if (top == null && bottom == null && left == null && right == null) return false
-
-    return (top == null || top.bottom == tile.top) &&
-            (bottom == null || bottom.top == tile.bottom) &&
-            (left == null || left.right == tile.left) &&
-            (right == null || right.left == tile.right)
+@Preview(showBackground = true)
+@Composable
+fun GameplayScreenMockupPreview() {
+    GameplayScreenPreview()
 }
 
 @Composable
-fun TileView(tile: Tile) {
-    Box(
-        modifier = Modifier
-            .size(64.dp)
-            .border(2.dp, Color.White)
-            .drawBehind {
-                val width = size.width
-                val height = size.height
-                val edge = 10f
+fun GameplayScreenPreview() {
+    val tileSize = 64.dp
 
-                drawRect(color = tile.top, topLeft = Offset(0f, 0f), size = Size(width, edge))
-                drawRect(
-                    color = tile.right,
-                    topLeft = Offset(width - edge, 0f),
-                    size = Size(edge, height)
-                )
-                drawRect(
-                    color = tile.bottom,
-                    topLeft = Offset(0f, height - edge),
-                    size = Size(width, edge)
-                )
-                drawRect(color = tile.left, topLeft = Offset(0f, 0f), size = Size(edge, height))
-                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF8B4513))
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Player",
+                        tint = if (index == 0) Color.Cyan else Color.Black,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(name, fontSize = 10.sp, color = Color.Black)
+                }
             }
-    )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            repeat(4) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(Color.Gray)
+                    )
+                    Text("18", color = Color.Black, fontSize = 14.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val gridSize = 5
+        Column {
+            repeat(gridSize) { y ->
+                Row {
+                    repeat(gridSize) { x ->
+                        Box(
+                            modifier = Modifier
+                                .size(tileSize)
+                                .padding(1.dp)
+                                .background(Color(0xFFD2B48C))
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(id = R.drawable.button_pxart),
+                    contentDescription = "Meeple",
+                    tint = Color.Black,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text("8x", color = Color.Black, fontSize = 16.sp)
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(tileSize)
+                    .background(Color.Green)
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(Color.Gray)
+                )
+                Text("10P", color = Color.Black, modifier = Modifier.padding(start = 4.dp))
+            }
+        }
+    }
 }
+
 
 @Composable
 fun GameplayScreen(gameId: String) {
@@ -905,6 +930,34 @@ fun GameplayScreen(gameId: String) {
 }
 
 @Composable
+fun TileView(tile: Tile) {
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .border(2.dp, Color.White)
+            .drawBehind {
+                val width = size.width
+                val height = size.height
+                val edge = 10f
+
+                drawRect(color = tile.top, topLeft = Offset(0f, 0f), size = Size(width, edge))
+                drawRect(
+                    color = tile.right,
+                    topLeft = Offset(width - edge, 0f),
+                    size = Size(edge, height)
+                )
+                drawRect(
+                    color = tile.bottom,
+                    topLeft = Offset(0f, height - edge),
+                    size = Size(width, edge)
+                )
+                drawRect(color = tile.left, topLeft = Offset(0f, 0f), size = Size(edge, height))
+                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
+            }
+    )
+}
+
+@Composable
 fun PixelArtButton(
     label: String,
     onClick: () -> Unit,
@@ -934,41 +987,59 @@ fun PixelArtButton(
     }
 }
 
-/*
-@Composable
-fun StyledGameButton(
-    label: String,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .width(240.dp)
-            .height(64.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xCC5A3A1A)
-        ),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 6.dp,
-            pressedElevation = 2.dp,
-            focusedElevation = 8.dp
-        ),
-        contentPadding = PaddingValues()
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.5.sp,
-                color = Color(0xFFFFF4C2)
-            )
-        }
+//Singleton TokenManager to store JWT
+object TokenManager {
+    var userToken: String? = null
+}
+
+//Custom parser to parse HTTP error messages returned by backend
+fun parseErrorMessage(body: String?): String {
+    return try {
+        val json = JSONObject(body ?: "")
+        json.getString("message")
+    } catch (_: Exception) {
+        "Unexpected error!"
     }
-} */
+}
+
+data class Tile(
+    val top: Color,
+    val right: Color,
+    val bottom: Color,
+    val left: Color
+) {
+    fun rotated(): Tile {
+        return Tile(
+            top = left,
+            right = top,
+            bottom = right,
+            left = bottom
+        )
+    }
+}
+
+fun generateRandomTile(): Tile {
+    val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow)
+    return Tile(
+        top = colors.random(),
+        right = colors.random(),
+        bottom = colors.random(),
+        left = colors.random()
+    )
+}
+
+fun canPlaceTile(
+    grid: List<List<Tile?>>, x: Int, y: Int, tile: Tile
+): Boolean {
+    val top = if (y > 0) grid[y - 1][x] else null
+    val bottom = if (y < grid.size - 1) grid[y + 1][x] else null
+    val left = if (x > 0) grid[y][x - 1] else null
+    val right = if (x < grid[y].size - 1) grid[y][x + 1] else null
+
+    if (top == null && bottom == null && left == null && right == null) return false
+
+    return (top == null || top.bottom == tile.top) &&
+            (bottom == null || bottom.top == tile.bottom) &&
+            (left == null || left.right == tile.left) &&
+            (right == null || right.left == tile.right)
+}
