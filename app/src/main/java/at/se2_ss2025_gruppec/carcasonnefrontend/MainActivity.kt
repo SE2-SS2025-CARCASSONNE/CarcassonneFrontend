@@ -172,9 +172,16 @@ fun LandingScreen(onStartTapped: () -> Unit) {
 @Composable
 fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     var username = viewModel.username
     var password = viewModel.password
     var isLoading = viewModel.isLoading
+
+    LaunchedEffect(true) {
+        viewModel.uiEvents.collect { message -> // Collect messages from ViewModel
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Box (modifier = Modifier.fillMaxSize()) {
         Image(
