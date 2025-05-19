@@ -40,8 +40,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.authApi
+import androidx.lifecycle.viewmodel.compose.viewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.gameApi
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.AuthViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
@@ -169,56 +170,11 @@ fun LandingScreen(onStartTapped: () -> Unit) {
 }
 
 @Composable
-fun AuthScreen(onAuthSuccess: (String) -> Unit) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isLoading by remember { (mutableStateOf(false)) }
-
-    fun login(username: String, password: String) {
-        isLoading = true
-
-        coroutineScope.launch {
-            val request = LoginRequest(username, password)
-            try {
-                val response = authApi.login(request) //Store TokenResponse in val response
-                TokenManager.userToken = response.token
-                onAuthSuccess(response.token) //Pass actual JWT string to onAuthSuccess
-            } catch (e: retrofit2.HttpException) { //Catch HTTP-specific exceptions
-                val errorBody = e.response()?.errorBody()?.string() //Get raw error body from HTTP response
-                val errorMsg = parseErrorMessage(errorBody) //Parse actual message from error body JSON
-                isLoading = false
-                Toast.makeText(context, "Login failed: $errorMsg", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) { //Catch-all for other exceptions
-                isLoading = false
-                Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
-    fun register(username: String, password: String) {
-        isLoading = true
-
-        coroutineScope.launch {
-            val request = RegisterRequest(username, password)
-            try {
-                authApi.register(request) //Success message easier to handle here, no need to store HTTP 201 from backend
-                isLoading = false
-                Toast.makeText(context, "Registration successful!", Toast.LENGTH_SHORT).show()
-            } catch (e: retrofit2.HttpException) {
-                val errorBody = e.response()?.errorBody()?.string()
-                val errorMsg = parseErrorMessage(errorBody)
-                isLoading = false
-                Toast.makeText(context, "Registration failed: $errorMsg", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                isLoading = false
-                Toast.makeText(context, "Registration failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
+fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewModel()
+) {
+    var username = viewModel.username
+    var password = viewModel.password
+    var isLoading = viewModel.isLoading
 
     Box (modifier = Modifier.fillMaxSize()) {
         Image(
@@ -239,7 +195,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
             ) {
                 OutlinedTextField( //Username input
                     value = username,
-                    onValueChange = { username = it },
+                    onValueChange = { viewModel.username = it },
                     label = { Text("Username") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -256,7 +212,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
 
                 OutlinedTextField( //Password input
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { viewModel.password = it },
                     label = { Text("Password") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
@@ -276,7 +232,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                     label = if (isLoading) "Logging in..." else "Login", //Simple loading indicator
                     onClick = {
                         if (!isLoading) {
-                            login(username, password)
+                            viewModel.login(onAuthSuccess)
                         }
                     }
                 )
@@ -286,7 +242,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                     label = if (isLoading) "Registering..." else "Register",
                     onClick = {
                         if (!isLoading) {
-                            register(username, password)
+                            viewModel.register()
                         }
                     }
                 )
@@ -933,42 +889,3 @@ fun PixelArtButton(
         )
     }
 }
-
-/*
-@Composable
-fun StyledGameButton(
-    label: String,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .width(240.dp)
-            .height(64.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xCC5A3A1A)
-        ),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 6.dp,
-            pressedElevation = 2.dp,
-            focusedElevation = 8.dp
-        ),
-        contentPadding = PaddingValues()
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.5.sp,
-                color = Color(0xFFFFF4C2)
-            )
-        }
-    }
-} */

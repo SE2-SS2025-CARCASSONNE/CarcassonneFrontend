@@ -6,7 +6,6 @@ import android.widget.Toast
 import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient
 import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.authApi
 import at.se2_ss2025_gruppec.carcasonnefrontend.LoginRequest
 import at.se2_ss2025_gruppec.carcasonnefrontend.RegisterRequest
@@ -29,7 +28,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val request = LoginRequest(username, password)
             try {
-                val response = ApiClient.authApi.login(request) //Store TokenResponse in val response
+                val response = authApi.login(request) //Store TokenResponse in val response
                 TokenManager.userToken = response.token
                 onAuthSuccess(response.token) //Pass actual JWT string to onAuthSuccess
             } catch (e: HttpException) { //Catch HTTP-specific exceptions
@@ -57,8 +56,9 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 val errorMsg = parseErrorMessage(errorBody)
                 Toast.makeText(context, "Registration failed: $errorMsg", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
-                isLoading = false
                 Toast.makeText(context, "Registration failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoading = false
             }
         }
     }
