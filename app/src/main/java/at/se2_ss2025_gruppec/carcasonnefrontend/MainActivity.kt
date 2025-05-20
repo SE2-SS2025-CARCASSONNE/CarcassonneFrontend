@@ -459,8 +459,7 @@ fun CreateGameScreen(navController: NavController) {
             painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         )
 
         Box(
@@ -719,106 +718,120 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
 
 @Preview(showBackground = true)
 @Composable
-fun GameplayScreenMockupPreview() {
-    GameplayScreenPreview()
+fun GameplayScreenPreview() {
+    GameplayScreenUI()
 }
 
 @Composable
-fun GameplayScreenPreview() {
-    val tileSize = 64.dp
+fun GameplayScreenUI() {
+    val tileSize = 98.dp
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF8B4513))
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        Image(
+            painter = painterResource(id = R.drawable.bg_pxart),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Player",
-                        tint = if (index == 0) Color.Cyan else Color.Black,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(name, fontSize = 10.sp, color = Color.Black)
+            Spacer(modifier = Modifier.height(15.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Player",
+                            tint = if (index == 0) Color.Green else Color.White,
+                            modifier = Modifier.size(30.dp)
+                        )
+                        Text(name, fontSize = 12.sp,
+                            color = if (index == 0) Color.Green else Color.White)
+                    }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            repeat(4) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(Color.Gray)
-                    )
-                    Text("18", color = Color.Black, fontSize = 14.sp)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val gridSize = 5
-        Column {
-            repeat(gridSize) { y ->
-                Row {
-                    repeat(gridSize) { x ->
-                        Box(
-                            modifier = Modifier
-                                .size(tileSize)
-                                .padding(1.dp)
-                                .background(Color(0xFFD2B48C))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                repeat(4) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        TileBackButton(
+                            label = "18",
+                            onClick = {}
                         )
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    painter = painterResource(id = R.drawable.button_pxart),
-                    contentDescription = "Meeple",
-                    tint = Color.Black,
-                    modifier = Modifier.size(24.dp)
-                )
-                Text("8x", color = Color.Black, fontSize = 16.sp)
+            Column {
+                repeat(5) { y ->
+                    Row {
+                        repeat(4) { x ->
+                            Box(
+                                modifier = Modifier
+                                    .size(tileSize)
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.demo_tile),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(tileSize)
-                    .background(Color.Green)
-            )
+            Spacer(modifier = Modifier.height(40.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 15.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.button_pxart),
+                        contentDescription = "Meeple",
+                        tint = Color.Black,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text("8x", color = Color.Black, fontSize = 16.sp)
+                }
+
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
-                        .background(Color.Gray)
+                        .size(tileSize)
+                        .background(Color.Green)
                 )
-                Text("10P", color = Color.Black, modifier = Modifier.padding(start = 4.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(Color.Gray)
+                    )
+                    Text("10P", color = Color.Black, modifier = Modifier.padding(start = 4.dp))
+                }
             }
         }
     }
@@ -982,6 +995,34 @@ fun PixelArtButton(
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.5.sp,
             color = Color(0xFFFFF4C2),
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+fun TileBackButton(
+    label: String,
+    onClick: () -> Unit,
+    backgroundRes: Int = R.drawable.tile_back
+) {
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clickable { onClick() }
+    ) {
+        Image(
+            painter = painterResource(id = backgroundRes),
+            contentDescription = "Tile back image",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Text(
+            text = label,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
             modifier = Modifier.align(Alignment.Center)
         )
     }
