@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Offset
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
+import androidx.compose.material.icons.filled.Settings
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
@@ -45,65 +46,149 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.gameApi
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
+import at.se2_ss2025_gruppec.carcasonnefrontend.SoundManager
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SoundManager.playMusic(this, R.raw.lobby_music)
 
         setContent {
-            val navController = rememberNavController()
-            var userToken by remember { mutableStateOf(TokenManager.userToken) }
+            Box(modifier = Modifier.fillMaxSize()) {
+                val navController = rememberNavController()
+                var userToken by remember { mutableStateOf(TokenManager.userToken) }
 
-            val stompClient by remember(userToken) { //Remember stompClient across recompositions, unless userToken changes
-                mutableStateOf(TokenManager.userToken?.let { //Init of stompClient only after authentication (= when userToken not null)
-                    MyClient(object : Callbacks {
-                        override fun onResponse(res: String) {
-                            Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
+                val stompClient by remember(userToken) {
+                    mutableStateOf(TokenManager.userToken?.let {
+                        MyClient(object : Callbacks {
+                            override fun onResponse(res: String) {
+                                Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
+                            }
+                        }).apply { connect() }
+                    })
+                }
+
+                NavHost(navController = navController, startDestination = "landing") {
+                    composable("landing") { LandingScreen(onStartTapped = {
+                        navController.navigate("auth") {
+                            popUpTo("landing") { inclusive = true }
                         }
-                    }).apply { connect() }
-                })
-            }
+                    })}
+                    composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
+                        TokenManager.userToken = jwtToken
+                        userToken = jwtToken
+                        navController.navigate("main") {
+                            popUpTo("auth") { inclusive = true }
+                        }
+                    })}
+                    composable("main") { MainScreen(navController) }
+                    composable("join_game") { JoinGameScreen(navController) }
+                    composable("create_game") { CreateGameScreen(navController) }
+                    composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
+                        val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
+                        val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
+                        val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
 
-            NavHost(navController = navController, startDestination = "landing") {
-                composable("landing") { LandingScreen(onStartTapped = {
-                    navController.navigate("auth") {
-                        popUpTo("landing") { inclusive = true }
+                        stompClient?.let {
+                            LobbyScreen(gameId, playerName, playerCount, it, navController)
+                        } ?: run {
+                            Log.e("MainActivity", "No stomp client available to show lobby")
+                            Toast.makeText(this@MainActivity, "Connection not ready!", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                })}
-                composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
-                    TokenManager.userToken = jwtToken //Store JWT in Singleton for persistence and easy access
-                    userToken = jwtToken //Triggers recomposition to init stompClient
-                    navController.navigate("main") {
-                        popUpTo("auth") { inclusive = true } //Lock user out of auth screen after authentication
-                    }
-                })}
-                composable("main") { MainScreen(navController) }
-                composable("join_game") { JoinGameScreen(navController) }
-                composable("create_game") { CreateGameScreen(navController) }
-
-                composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
-                    val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-                    val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
-                    val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
-
-                    stompClient?.let {
-                        LobbyScreen(
-                            gameId = gameId,
-                            playerName = playerName,
-                            playerCount = playerCount,
-                            stompClient = it,
-                            navController = navController
-                        )
-                    } ?: run {
-                        Log.e("MainActivity", "No stomp client available to show lobby")
-                        Toast.makeText(this@MainActivity, "Connection not ready!", Toast.LENGTH_SHORT).show()
+                    composable("gameplay/{gameId}") { backStackEntry ->
+                        val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
+                        GameplayScreen(gameId)
                     }
                 }
-                composable("gameplay/{gameId}") { backStackEntry ->
-                    val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-                    GameplayScreen(gameId)
+                GlobalSoundMenu()
+            }
+        }
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        SoundManager.stopMusic()
+    }
+}
+@Composable
+fun GlobalSoundMenu() {
+    var showVolumeControl by remember { mutableStateOf(false) }
+    var volumeLevel by remember { mutableStateOf(0.5f) }
+    var isMuted by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Top-right floating gear icon
+        IconButton(
+            onClick = { showVolumeControl = !showVolumeControl },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Settings",
+                tint = Color.White,
+                modifier = Modifier.size(46.dp)
+            )
+        }
+
+        if (showVolumeControl) {
+            // Transparent full-screen dismiss layer
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Transparent)
+                    .clickable { showVolumeControl = false } // click outside = close
+            )
+
+            // Settings popup on top
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 64.dp, end = 16.dp)
+                    .background(Color(0xCC5A3A1A), shape = RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Music Volume", color = Color.White)
+                    Slider(
+                        value = if (isMuted) 0f else volumeLevel,
+                        onValueChange = {
+                            volumeLevel = it
+                            isMuted = it == 0f
+                            SoundManager.setVolume(it)
+                        },
+                        valueRange = 0f..1f,
+                        steps = 5,
+                        modifier = Modifier.width(120.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Color.Yellow,
+                            inactiveTrackColor = Color.Gray
+                        )
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                isMuted = true
+                                SoundManager.setVolume(0f)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A4A2A))
+                        ) {
+                            Text("Mute", color = Color.White)
+                        }
+                        Button(
+                            onClick = {
+                                isMuted = false
+                                SoundManager.setVolume(volumeLevel)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A4A2A))
+                        ) {
+                            Text("Unmute", color = Color.White)
+                        }
+                    }
                 }
             }
         }
@@ -812,6 +897,10 @@ fun GameplayScreen(gameId: String) {
         }
     }
     val context = LocalContext.current
+    //Switch to gameplay music when this screen starts
+    LaunchedEffect(Unit) {
+        SoundManager.playMusic(context, R.raw.gameplay_music)
+    }
     val currentTile = remember { mutableStateOf(generateRandomTile()) }
 
     Column(
