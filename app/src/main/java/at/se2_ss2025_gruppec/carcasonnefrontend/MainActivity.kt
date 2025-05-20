@@ -22,7 +22,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -33,8 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.Offset
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -137,12 +134,7 @@ fun LandingScreen(onStartTapped: () -> Unit) {
             .fillMaxSize()
             .clickable { onStartTapped() } //Make entire screen clickable (= tap anywhere to continue)
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -223,12 +215,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
     }
 
     Box (modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop, //Maintains aspect ratio (FillBounds causes warping!)
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Box(
             modifier = Modifier
@@ -308,13 +295,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
 @Composable
 fun MainScreen(navController: NavController) {
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-        )
+        BackgroundImage()
 
         Box(
             modifier = Modifier
@@ -349,12 +330,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Box(
             modifier = Modifier
@@ -455,12 +431,7 @@ fun CreateGameScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Box(
             modifier = Modifier
@@ -598,12 +569,7 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Text(
             text = "Lobby",
@@ -719,254 +685,138 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
 @Preview(showBackground = true)
 @Composable
 fun GameplayScreenPreview() {
-    GameplayScreenUI()
+    GameplayScreen("123")
 }
-
-@Composable
-fun GameplayScreenUI() {
-    val tileSize = 98.dp
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(15.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Player",
-                            tint = if (index == 0) Color.Green else Color.White,
-                            modifier = Modifier.size(30.dp)
-                        )
-                        Text(name, fontSize = 12.sp,
-                            color = if (index == 0) Color.Green else Color.White)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                repeat(4) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        TileBackButton(
-                            label = "18",
-                            onClick = {}
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Column {
-                repeat(5) { y ->
-                    Row {
-                        repeat(4) { x ->
-                            Box(
-                                modifier = Modifier
-                                    .size(tileSize)
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.demo_tile),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 15.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.button_pxart),
-                        contentDescription = "Meeple",
-                        tint = Color.Black,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text("8x", color = Color.Black, fontSize = 16.sp)
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(tileSize)
-                        .background(Color.Green)
-                )
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(Color.Gray)
-                    )
-                    Text("10P", color = Color.Black, modifier = Modifier.padding(start = 4.dp))
-                }
-            }
-        }
-    }
-}
-
 
 @Composable
 fun GameplayScreen(gameId: String) {
-    val gridSize = 5
-    val grid = remember {
-        mutableStateListOf<MutableList<Tile?>>().apply {
-            repeat(gridSize) {
-                add(MutableList(gridSize) { null })
-            }
-            this[gridSize / 2][gridSize / 2] = generateRandomTile() // center tile
-        }
-    }
-    val context = LocalContext.current
-    val currentTile = remember { mutableStateOf(generateRandomTile()) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        BackgroundImage()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Game ID: $gameId",
-            color = Color.White,
-            fontSize = 20.sp,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            Spacer(modifier = Modifier.height(15.dp))
 
-        //Grid
-        Column {
-            for (y in 0 until gridSize) {
-                Row {
-                    for (x in 0 until gridSize) {
-                        val tile = grid[y][x]
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .padding(2.dp)
-                                .background(Color.DarkGray)
-                                .clickable {
-                                    if (tile == null && canPlaceTile(
-                                            grid,
-                                            x,
-                                            y,
-                                            currentTile.value
-                                        )
-                                    ) {
-                                        grid[y][x] = currentTile.value
-                                        currentTile.value = generateRandomTile()
-                                    } else {
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                "Can't place tile here",
-                                                Toast.LENGTH_SHORT
-                                            )
-                                            .show()
-                                    }
-                                }
-                        ) {
-                            tile?.let {
-                                TileView(it)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+            PlayerRow()
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-        Text("Next Tile:", color = Color.White)
-        TileView(currentTile.value)
-        Button(
-            onClick = {
-                currentTile.value = generateRandomTile()
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Gray,
-                contentColor = Color.White
-            ),
-            modifier = Modifier
-                .padding(top = 12.dp)
-        ) {
-            Text("Skip Tile")
-        }
-        Spacer(modifier = Modifier.width(16.dp))
+            TileBackRow()
 
-        Button(
-            onClick = {
-                currentTile.value = currentTile.value.rotated()
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Gray,
-                contentColor = Color.White
-            ),
-            modifier = Modifier
-                .padding(top = 12.dp)
-        ) {
-            Text("Rotate Tile")
+            Spacer(modifier = Modifier.height(20.dp))
+
+            PannableTileGrid()
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            BottomScreenBar()
         }
     }
 }
 
 @Composable
-fun TileView(tile: Tile) {
-    Box(
-        modifier = Modifier
-            .size(64.dp)
-            .border(2.dp, Color.White)
-            .drawBehind {
-                val width = size.width
-                val height = size.height
-                val edge = 10f
-
-                drawRect(color = tile.top, topLeft = Offset(0f, 0f), size = Size(width, edge))
-                drawRect(
-                    color = tile.right,
-                    topLeft = Offset(width - edge, 0f),
-                    size = Size(edge, height)
-                )
-                drawRect(
-                    color = tile.bottom,
-                    topLeft = Offset(0f, height - edge),
-                    size = Size(width, edge)
-                )
-                drawRect(color = tile.left, topLeft = Offset(0f, 0f), size = Size(edge, height))
-                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
+fun PannableTileGrid() {
+    Column {
+        repeat(5) { y ->
+            Row {
+                repeat(4) { x ->
+                    Box(
+                        modifier = Modifier
+                            .size(98.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.demo_tile),
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+fun PlayerRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Player",
+                    tint = if (index == 0) Color.Green else Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
+                Text(name, fontSize = 12.sp,
+                    color = if (index == 0) Color.Green else Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun BottomScreenBar() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                painter = painterResource(id = R.drawable.button_pxart),
+                contentDescription = "Meeple",
+                tint = Color.Black,
+                modifier = Modifier.size(24.dp)
+            )
+            Text("8x", color = Color.Black, fontSize = 16.sp)
+        }
+
+        Box(
+            modifier = Modifier
+                .size(98.dp)
+                .background(Color.Green)
+        )
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(Color.Gray)
+            )
+            Text("10P", color = Color.Black, modifier = Modifier.padding(start = 4.dp))
+        }
+    }
+}
+
+@Composable
+fun TileBackRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        repeat(4) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TileBackButton(
+                    label = "18",
+                    onClick = {}
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun BackgroundImage() {
+    Image(
+        painter = painterResource(id = R.drawable.bg_pxart),
+        contentDescription = null,
+        contentScale = ContentScale.Crop, // Maintains aspect ratio & prevents warping
+        modifier = Modifier.fillMaxSize()
     )
 }
 
@@ -1057,30 +907,4 @@ data class Tile(
             left = bottom
         )
     }
-}
-
-fun generateRandomTile(): Tile {
-    val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow)
-    return Tile(
-        top = colors.random(),
-        right = colors.random(),
-        bottom = colors.random(),
-        left = colors.random()
-    )
-}
-
-fun canPlaceTile(
-    grid: List<List<Tile?>>, x: Int, y: Int, tile: Tile
-): Boolean {
-    val top = if (y > 0) grid[y - 1][x] else null
-    val bottom = if (y < grid.size - 1) grid[y + 1][x] else null
-    val left = if (x > 0) grid[y][x - 1] else null
-    val right = if (x < grid[y].size - 1) grid[y][x + 1] else null
-
-    if (top == null && bottom == null && left == null && right == null) return false
-
-    return (top == null || top.bottom == tile.top) &&
-            (bottom == null || bottom.top == tile.bottom) &&
-            (left == null || left.right == tile.left) &&
-            (right == null || right.left == tile.right)
 }
