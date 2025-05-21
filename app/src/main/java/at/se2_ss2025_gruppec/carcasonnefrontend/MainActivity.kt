@@ -718,9 +718,42 @@ fun GameplayScreen(gameId: String) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            PannableTileGrid()
+            val tiles = remember { // Just for showcasing UI, delete later
+                listOf(
+                    TileData(x = 0, y = 0, drawableRes = R.drawable.tile_a),
+                    TileData(x = 1, y = 0, drawableRes = R.drawable.tile_b),
+                    TileData(x = 2, y = 0, drawableRes = R.drawable.tile_c),
+                    TileData(x = 4, y = 0, drawableRes = R.drawable.tile_d),
+                    TileData(x = 0, y = 1, drawableRes = R.drawable.tile_e),
+                    TileData(x = 2, y = 1, drawableRes = R.drawable.tile_f),
+                    TileData(x = 3, y = 1, drawableRes = R.drawable.tile_g),
+                    TileData(x = 4, y = 1, drawableRes = R.drawable.tile_h),
+                    TileData(x = 1, y = 2, drawableRes = R.drawable.tile_i),
+                    TileData(x = 2, y = 2, drawableRes = R.drawable.tile_j),
+                    TileData(x = 4, y = 2, drawableRes = R.drawable.tile_k),
+                    TileData(x = 0, y = 3, drawableRes = R.drawable.tile_x),
+                    TileData(x = 1, y = 3, drawableRes = R.drawable.tile_m),
+                    TileData(x = 2, y = 3, drawableRes = R.drawable.tile_n),
+                    TileData(x = 3, y = 3, drawableRes = R.drawable.tile_o),
+                    TileData(x = 0, y = 4, drawableRes = R.drawable.tile_p),
+                    TileData(x = 2, y = 4, drawableRes = R.drawable.tile_q),
+                    TileData(x = 3, y = 4, drawableRes = R.drawable.tile_r),
+                    TileData(x = 4, y = 4, drawableRes = R.drawable.tile_s),
+                    TileData(x = 1, y = 5, drawableRes = R.drawable.tile_t),
+                    TileData(x = 2, y = 5, drawableRes = R.drawable.tile_a),
+                    TileData(x = 4, y = 5, drawableRes = R.drawable.tile_b)
+                )
+            }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            PannableTileGrid(
+                tiles = tiles,
+                onTileClick = { x, y ->
+                    println("Tapped tile at ($x, $y)")
+                },
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(130.dp))
 
             BottomScreenBar()
         }
