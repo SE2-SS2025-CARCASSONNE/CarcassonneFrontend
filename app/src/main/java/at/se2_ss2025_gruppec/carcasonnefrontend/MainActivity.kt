@@ -8,10 +8,13 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,11 +24,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +56,10 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,7 +92,7 @@ class MainActivity : ComponentActivity() {
                         popUpTo("auth") { inclusive = true } //Lock user out of auth screen after authentication
                     }
                 })}
-                composable("main") { MainScreen(navController) }
+                composable("main") { GameplayScreen("1") } // Just for dev, to avoid having to run backend, change back later
                 composable("join_game") { JoinGameScreen(navController) }
                 composable("create_game") { CreateGameScreen(navController) }
 
@@ -694,7 +708,7 @@ fun GameplayScreen(gameId: String) {
         BackgroundImage()
 
         Column(modifier = Modifier.fillMaxSize()) {
-            Spacer(modifier = Modifier.height(15.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
             PlayerRow()
 
@@ -713,23 +727,77 @@ fun GameplayScreen(gameId: String) {
     }
 }
 
+data class TileData(
+    val x: Int,
+    val y: Int,
+    val drawableRes: Int? = null
+)
+
 @Composable
-fun PannableTileGrid() {
-    Column {
-        repeat(5) { y ->
-            Row {
-                repeat(4) { x ->
-                    Box(
-                        modifier = Modifier
-                            .size(98.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.demo_tile),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
-                        )
+fun PannableTileGrid(
+    tiles: List<TileData>,
+    onTileClick: (Int, Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val tileSize = 120.dp
+    val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
+    val context = LocalContext.current
+
+    val scale = remember { mutableFloatStateOf(1f) }
+    val offsetX = remember { mutableFloatStateOf(0f) }
+    val offsetY = remember { mutableFloatStateOf(0f) }
+    val imageCache = remember { mutableMapOf<Int, ImageBitmap>() }
+
+    val gestureModifier = Modifier
+        .pointerInput(Unit) {
+            detectTransformGestures { _, pan, zoom, _ ->
+                scale.floatValue *= zoom
+                offsetX.floatValue += pan.x
+                offsetY.floatValue += pan.y
+            }
+        }
+        .pointerInput(Unit) {
+            detectTapGestures { offset ->
+                val tileSizePxScaled = tileSizePx * scale.floatValue
+                val x = ((offset.x - offsetX.floatValue) / tileSizePxScaled).toInt()
+                val y = ((offset.y - offsetY.floatValue) / tileSizePxScaled).toInt()
+                onTileClick(x, y)
+            }
+        }
+
+    Box(
+        modifier = modifier
+            .clipToBounds()
+            .then(gestureModifier)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val scaledTileSizePx = tileSizePx * scale.floatValue
+
+            tiles.forEach { tile ->
+                val x = tile.x
+                val y = tile.y
+                val left = x * scaledTileSizePx + offsetX.floatValue
+                val top = y * scaledTileSizePx + offsetY.floatValue
+
+                val image = tile.drawableRes?.let { resId ->
+                    imageCache.getOrPut(resId) {
+                        ContextCompat.getDrawable(context, resId)?.toBitmap()
+                            ?.asImageBitmap() ?: ImageBitmap(1, 1)
                     }
+                }
+
+                if (image != null) {
+                    drawImage(
+                        image = image,
+                        dstOffset = IntOffset(left.toInt(), top.toInt()),
+                        dstSize = IntSize(scaledTileSizePx.toInt(), scaledTileSizePx.toInt())
+                    )
+                } else {
+                    drawRect(
+                        color = Color.Gray,
+                        topLeft = Offset(left, top),
+                        size = Size(scaledTileSizePx, scaledTileSizePx)
+                    )
                 }
             }
         }
@@ -759,39 +827,47 @@ fun PlayerRow() {
 
 @Composable
 fun BottomScreenBar() {
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .height(72.dp)
+            .background(Color.White)
             .padding(horizontal = 15.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        contentAlignment = Alignment.Center
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                painter = painterResource(id = R.drawable.button_pxart),
-                contentDescription = "Meeple",
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp)
-            )
-            Text("8x", color = Color.Black, fontSize = 16.sp)
-        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(id = R.drawable.button_pxart),
+                    contentDescription = "Meeple",
+                    tint = Color.Black,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text("8x", color = Color.Black, fontSize = 16.sp)
+            }
 
-        Box(
-            modifier = Modifier
-                .size(98.dp)
-                .background(Color.Green)
-        )
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
-                    .background(Color.Gray)
+                    .size(98.dp)
+                    .background(Color.Green)
             )
-            Text("10P", color = Color.Black, modifier = Modifier.padding(start = 4.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(Color.Gray)
+                )
+                Text("10P", color = Color.Black, modifier = Modifier.padding(start = 4.dp))
+            }
         }
     }
 }
+
 
 @Composable
 fun TileBackRow() {
@@ -890,21 +966,5 @@ fun parseErrorMessage(body: String?): String {
         json.getString("message")
     } catch (_: Exception) {
         "Unexpected error!"
-    }
-}
-
-data class Tile(
-    val top: Color,
-    val right: Color,
-    val bottom: Color,
-    val left: Color
-) {
-    fun rotated(): Tile {
-        return Tile(
-            top = left,
-            right = top,
-            bottom = right,
-            left = bottom
-        )
     }
 }
