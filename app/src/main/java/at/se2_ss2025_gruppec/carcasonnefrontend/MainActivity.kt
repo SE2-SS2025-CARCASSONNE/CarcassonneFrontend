@@ -3,6 +3,7 @@ package at.se2_ss2025_gruppec.carcasonnefrontend
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Layout
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -16,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -857,7 +859,199 @@ fun PlayerRow() {
         }
     }
 }
+/*
+@Composable
+fun BottomScreenBar() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp) // Höhe so bemessen, dass Badge und Karte Platz haben
+    ) {
+        // 1) Holz-Panel als Hintergrund
+        Image(
+            painter = painterResource(id = R.drawable.bg_pxart),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            //modifier = Modifier.matchParentSize()
+            modifier = Modifier.size(24.dp)
+        )
 
+        // 2) Inhalt: Meeple-Icon links, Spacer, Karte+Badge rechts
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Linke Seite: Meeple + Count
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.meepl_grn),
+                    contentDescription = "Meeple",
+                    modifier = Modifier.size(55.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+
+
+                Text(
+
+                    text = "8x",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+
+                )
+            }
+
+
+            Box(
+                modifier = Modifier.size(64.dp), // oder gewünschte Größe
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.meepl_grn),
+                        contentDescription = "Meeple",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Text(
+                        text = "8x",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            // Mittlerer Platzhalter (kann später beliebig belegt werden)
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Rechte Seite: Karte + Punkt-Badge
+            Box(
+                modifier = Modifier
+                    .width(100.dp)
+                    .height(120.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                // Karten-Rückseite
+                Image(
+                    painter = painterResource(id = R.drawable.tile_back),
+                    contentDescription = "Tile Back",
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.size(90.dp)
+                )
+                // Punkte-Badge unten an der Karte
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            color = Color.White,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 25.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "10P",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+        }
+    }
+}*/
+@Composable
+fun BottomScreenBar() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp) // Höhe so bemessen, dass Badge und Karte Platz haben
+    ) {
+        // 1) Holz-Panel als Hintergrund
+        Image(
+            painter = painterResource(id = R.drawable.bg_pxart),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.size(24.dp)
+        )
+
+        // 2) Inhalt: Meeple-Icon links, Spacer, Karte+Badge rechts
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Linke Seite: Meeple + Count unterhalb
+            Box(
+                modifier = Modifier.size(110.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.meepl_grn),
+                        contentDescription = "Meeple",
+                        modifier = Modifier.size(65.dp)
+                    )
+                    Text(
+                        text = "8x",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            // Mittlerer Platzhalter (z. B. für zukünftige Buttons oder Icons)
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Rechte Seite: Karte + Punkt-Badge
+            Box(
+                modifier = Modifier
+                    .width(100.dp)
+                    .height(120.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                // Karten-Rückseite
+                Image(
+                    painter = painterResource(id = R.drawable.tile_back),
+                    contentDescription = "Tile Back",
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.size(90.dp)
+                )
+
+                // Punkte-Badge unten an der Karte
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            color = Color.White,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 25.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "10P",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+/*
 @Composable
 fun BottomScreenBar() {
     Box(
@@ -900,7 +1094,7 @@ fun BottomScreenBar() {
         }
     }
 }
-
+*/
 
 @Composable
 fun TileBackRow() {
