@@ -87,13 +87,12 @@ class MainActivity : ComponentActivity() {
                     composable("main") { MainScreen(navController) }
                     composable("join_game") { JoinGameScreen(navController) }
                     composable("create_game") { CreateGameScreen(navController) }
-                    composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
+                    composable("lobby/{gameId}") { backStackEntry ->
                         val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-                        val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
-                        val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
+                        val playerName = TokenManager.loggedInUsername ?: "Unknown"
 
                         stompClient?.let {
-                            LobbyScreen(gameId, playerName, playerCount, it, navController)
+                            LobbyScreen(gameId = gameId, playerName = playerName, stompClient = it, navController = navController)
                         } ?: run {
                             Log.e("MainActivity", "No stomp client available to show lobby")
                             Toast.makeText(this@MainActivity, "Connection not ready!", Toast.LENGTH_SHORT).show()
@@ -324,7 +323,10 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                     label = if (isLoading) "Logging in..." else "Login", //Simple loading indicator
                     onClick = {
                         if (!isLoading) {
-                            viewModel.login(onAuthSuccess)
+                            viewModel.login { jwt ->
+                                TokenManager.loggedInUsername = viewModel.username
+                                onAuthSuccess(jwt)
+                            }
                         }
                     }
                 )
@@ -365,7 +367,7 @@ fun MainScreen(navController: NavController) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 240.dp),
+                .padding(bottom = 320.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -391,7 +393,6 @@ fun MainScreen(navController: NavController) {
 fun JoinGameScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
     var gameId by remember { mutableStateOf("") }
-    var playerName by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -434,38 +435,19 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                     )
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = playerName,
-                    onValueChange = { playerName = it },
-                    label = { Text("Enter your name") },
-                    modifier = Modifier.width(220.dp),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFFFF4C2),
-                        textAlign = TextAlign.Center
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.White,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    )
-                )
-
                 Spacer(modifier = Modifier.height(50.dp))
 
                 PixelArtButton(
                     label = "Join",
                     onClick = {
-                        if (gameId.isBlank() || playerName.isBlank()) {
-                            Toast.makeText(context, "Enter game ID and player name", Toast.LENGTH_SHORT).show()
+                        if (gameId.isBlank()) {
+                            Toast.makeText(context, "Please enter a game ID", Toast.LENGTH_SHORT).show()
+                            return@PixelArtButton
+                        }
+
+                        val username = TokenManager.loggedInUsername
+                        if (username.isNullOrBlank()) {
+                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
                             return@PixelArtButton
                         }
 
@@ -475,12 +457,11 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                                     ?: throw IllegalStateException("Token is required, but was null!")
 
                                 val gameState = gameApi.getGame(
-                                    token = "Bearer $token", // Append JWT to API call
+                                    token = "Bearer $token",
                                     gameId = gameId
                                 )
                                 val playerCount = gameState.players.size.coerceAtLeast(2)
-
-                                navController.navigate("lobby/$gameId/$playerCount/$playerName")
+                                navController.navigate("lobby/$gameId")
                             } catch (e: Exception) {
                                 Log.e("JoinGame", "Exception during getGame: ${e.message}", e)
                                 Toast.makeText(context, "Game not found or connection failed: ${e.message}", Toast.LENGTH_LONG).show()
@@ -496,7 +477,6 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 @Composable
 fun CreateGameScreen(navController: NavController) {
     var selectedPlayers by remember { mutableStateOf(2) }
-    var playerName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -505,44 +485,17 @@ fun CreateGameScreen(navController: NavController) {
             painter = painterResource(id = R.drawable.bg_pxart),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         )
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 210.dp),
+                .padding(bottom = 320.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                //Name input field
-                OutlinedTextField(
-                    value = playerName,
-                    onValueChange = { playerName = it },
-                    label = { Text("Enter your name") },
-                    modifier = Modifier.width(220.dp),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFFFF4C2),
-                        textAlign = TextAlign.Center
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.White,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(48.dp)) // Added some spacing since we removed the input field
 
                 Text(
                     text = "Select Player Count:",
@@ -573,22 +526,19 @@ fun CreateGameScreen(navController: NavController) {
                 PixelArtButton(
                     label = "Create",
                     onClick = {
-                        val hostName = playerName.trim()
-                        if (hostName.isEmpty()) {
-                            Toast.makeText(context, "Please enter your name", Toast.LENGTH_SHORT).show()
-                            return@PixelArtButton
+                        val hostName = TokenManager.loggedInUsername ?: return@PixelArtButton.also {
+                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
                         }
 
                         coroutineScope.launch {
                             try {
-                                //Retrieve token from Singleton and append it to API call
                                 val token = TokenManager.userToken ?: throw IllegalStateException("Token is required, but was null!")
                                 val response = gameApi.createGame(
                                     token = "Bearer $token",
                                     request = CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
                                 Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
-                                navController.navigate("lobby/${response.gameId}/$selectedPlayers/$hostName")
+                                navController.navigate("lobby/${response.gameId}")
 
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
@@ -602,42 +552,51 @@ fun CreateGameScreen(navController: NavController) {
 }
 
 @Composable
-fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompClient: MyClient, navController: NavController) {
+fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
     val players = remember { mutableStateListOf(playerName) }
+    val hostName = remember { mutableStateOf("") }
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+
+    fun handleLobbyMessage(message: String) {
+        Log.d("WebSocket", "Received message: $message")
+        val json = JSONObject(message)
+        when (json.getString("type")) {
+            "game_started" -> {
+                Handler(Looper.getMainLooper()).post {
+                    navController.navigate("gameplay/$gameId")
+                }
+            }
+            "player_joined" -> {
+                val playerArray = json.getJSONArray("players")
+                val host = json.optString("host", "")
+                Handler(Looper.getMainLooper()).post {
+                    players.clear()
+                    for (i in 0 until playerArray.length()) {
+                        players.add(playerArray.getString(i))
+                    }
+                    hostName.value = host
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (!stompClient.isConnected()) {
             delay(100)
         }
+
+        //Subscribe to both public and private channels
+        stompClient.listenOn("/topic/game/$gameId") { handleLobbyMessage(it) }
+        stompClient.listenOn("/user/queue/private") { handleLobbyMessage(it) }
+        delay(700) //In order to give time for subscription to happen
+        //Send join AFTER subscriptions
         try {
             Log.d("LobbyScreen", "Sending join_game for $playerName to $gameId")
             stompClient.sendJoinGame(gameId, playerName)
         } catch (e: Exception) {
             Log.e("LobbyScreen", "Failed to send join_game: ${e.message}")
             Toast.makeText(context, "Failed to join game: ${e.message}", Toast.LENGTH_LONG).show()
-        }
-        stompClient.listenOn("/topic/game/$gameId") { message ->
-            Log.d("WebSocket", "Received message: $message")
-            val json = JSONObject(message)
-            when (json.getString("type")) {
-                "game_started" -> {
-                    Handler(Looper.getMainLooper()).post {
-                        navController.navigate("gameplay/$gameId")
-                    }
-                }
-                "player_joined" -> {
-                    val playerArray = json.getJSONArray("players")
-                    Handler(Looper.getMainLooper()).post {
-                        players.clear()
-                        for (i in 0 until playerArray.length()) {
-                            players.add(playerArray.getString(i))
-                        }
-                        Log.d("Lobby", "Updated players in lobby: $players")
-                    }
-                }
-            }
         }
     }
 
@@ -712,9 +671,10 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
             )
             Spacer(modifier = Modifier.height(24.dp))
 
-            for (i in 1..playerCount) {
-                val playerNameInList = players.getOrNull(i - 1) ?: "Empty Slot"
-                Log.d("LobbyScreen", "Checking: [$playerNameInList] vs [$playerName]")
+            val maxPlayers = 4
+
+            for (i in 0 until maxPlayers) {
+                val playerNameInList = players.getOrNull(i) ?: "Empty Slot"
                 val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
 
                 Button(
@@ -741,23 +701,25 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
 
             Spacer(modifier = Modifier.height(68.dp))
 
-            Button(
-                onClick = {
-                    Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
-                    stompClient.sendStartGame(gameId)
-                },
-                modifier = Modifier
-                    .width(200.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC5A3A1A))
-            ) {
-                Text(
-                    text = "Start Game",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+            if (hostName.value == playerName) {
+                Button(
+                    onClick = {
+                        Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
+                        stompClient.sendStartGame(gameId)
+                    },
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC5A3A1A))
+                ) {
+                    Text(
+                        text = "Start Game",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+            }
             }
         }
     }
@@ -766,6 +728,7 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
 //Singleton TokenManager to store JWT
 object TokenManager {
     var userToken: String? = null
+    var loggedInUsername: String? = null
 }
 
 //Custom parser to parse HTTP error messages returned by backend
