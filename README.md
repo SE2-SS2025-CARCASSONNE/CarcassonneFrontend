@@ -4,7 +4,7 @@
 ## 📑 Inhaltsverzeichnis
 
 - [1. Game Specification](#1-game-specification)
-    - [1.1 Spielübersicht](#11-spielübersicht)
+  - [1.1 Spielübersicht](#11-spielübersicht)
   - [1.2 Spiellogik](#12-spiellogik)
   - [1.3 Systemdesign](#13-systemdesign)
   - [1.4 UIUX Anforderungen](#14-uiux-anforderungen)
@@ -132,14 +132,8 @@ Nach der letzten Runde, wenn der letzte Spieler seine Karte gelegt und ggf. eine
 
 **Wichtige Entitäten:**
 
-- **User**: Spielerprofil (Username, Email, ID, Statistiken)
-- **Game**: Spielsession mit Status, Spielern, aktueller Spieler
-- **Tile**: Karten mit ID, Rotation, Position, Typ
-- **Meeple**: Zugewiesenem Spieler + Position
-- **Move**: Protokoll jeder Spieleraktion
-- **Score**: Aktueller Punktestand pro Spieler
-- **ChatMessage**: Nachrichten im Spielchat
-- **GamePlayer**: Verbindung User ↔ Game (Score, Meeples)
+- **User**: Spielerprofil mit ID, Username, Password und Highscore
+- **Game**: Spielsession mit GameCode, Status und Gewinner
 
 #### ▶️ Datenbank (PostgreSQL)
 
@@ -150,15 +144,8 @@ Nach der letzten Runde, wenn der letzte Spieler seine Karte gelegt und ggf. eine
 - Spielverlauf und Statistiken
 
 **Tabellen (per Spring JPA generiert):**
-
-- `users`: Spieler mit UUID, Name, Email
-- `games`: Spiele mit Status und Timestamp
-- `game_players`: Punkte und Meeples je Spieler/Spiel
-- `tiles`: Kartenplatzierung, Rotation, Typ
-- `meeples`: Spieler, Karte, Segment
-- `score`: GamePlayer, Score, Timestamp
-- `chat_messages`: Game, Sender, Message, Timestamp
-- `moves`: Logs zu Spielaktionen, z. B. wie oft Meeples platziert, Features vervollständigt etc.
+- `users`: Spieler mit ID, Name und Highscore (Passwort wird gehasht gespeichert)
+- `games`: Spiele mit Spielcode, Status, Gewinner und Erstellungszeitpunkt
 
 #### ▶️ Frontend (Jetpack Compose)
 
@@ -186,19 +173,19 @@ Nach der letzten Runde, wenn der letzte Spieler seine Karte gelegt und ggf. eine
 
 **Oberer Bereich:**
 
-- Aktueller Spieler
+- Aktueller Spieler hervorgehoben
 - Punktetafel mit Namen, Punkte, verfügbare Meeples
 
 **Mittelteil:**
 
 - Dynamisches Spielfeld (scroll-/zoombar)
-- Neue Karte erscheint nahe der zuletzt gelegten
-- Platzierung per Tippen, Rotieren und Drag&Drop
+- Platzierung von Karte und Meeple per Tippen, Rotieren und Drag&Drop
 
 **Unterer Bereich:**
 
-- 🔁 Drehen
-- ⛹ Meeple platzieren
+- Meeple inkl. Anzahl des aktuellen Spielers
+- Neue Karte etwas größer dargestellt
+- 🔁 Drehen per Tippen
 - ✅ Platzierung bestätigen
 
 **Endansicht:**
@@ -234,12 +221,8 @@ Nach der letzten Runde, wenn der letzte Spieler seine Karte gelegt und ggf. eine
 
 ### 1.6 Endabrechnung
 
-Nach dem letzten Zug ist das Spielfeld vollständig. Noch platzierte Meeples auf unvollständigen Features werden gewertet (siehe Punktevergabe).
+Nach dem letzten Zug ist das Spielfeld vollständig. Noch platzierte Meeples auf unvollständigen Features werden gewertet (siehe Punktevergabe) und automatisch vom Spielfeld entfernt.
 
-**Offene Fragen für Design:**
-
-- Werden Meeples automatisch entfernt und Punkte vergeben?
-- Oder kann auf jedes unfertige Feature gezoomt werden mit Pop-up zur Punkteanzeige?
 
 ---
 
@@ -249,16 +232,21 @@ Dieser Abschnitt enthält visuelle Entwürfe (Mockups) zur Benutzeroberfläche.
 
 ### 💡 Geplante Screens:
 
-- **Tile Placement GUI**: Grafische Hervorhebung auswählbarer Positionen für ein Tile, Gewähltes Tile neben Score-Anzeige sichtbar
-- **Game Screen Default GUI**: Map der bereits platzierten Tiles zentral, oben Spielerleiste, Der aktuelle Spieler wird hervorgehoben, Score/Meeple Anzeige unter der Map, Tile-Deck unter Spielerleiste sichtbar
+- **Landing Page**: Startbildschirm der App mit Logo und Einstiegsmöglichkeiten
+- **Authentication Screen**: Login/Registrierung zur Nutzerverwaltung
+- **Game Lobby**: Auswahl: Neues Spiel erstellen oder bestehendem Spiel beitreten
+- **Join Game**: Eingabe einer Game-ID, um einem laufenden Spiel beizutreten
+- **Gameplay Screen**: Hauptspielbildschirm mit Kartenplatzierung und Spielinformationen
 
+### 📷 Vorschau:
 
-### 📷 Vorschau (Bilder im Ordner `images/`)
-
-| Ansicht                 | Vorschau                              |
-|-------------------------|---------------------------------------|
-| Tile Placement GUI      | ![Tile Placement GUI](img.png)        |
-| Game Screen Default GUI | ![Game Screen Default GUI](img_1.png) |
+| Ansicht               | Vorschau                                                              |
+|-----------------------|-----------------------------------------------------------------------|
+| Landing Page          | ![Landing Page](docs/images/250524_LandingPage.png)                   |
+| Authentication Screen | ![Authentication Screen](docs/images/250524_AuthenticationScreen.png) |
+| Game Lobby            | ![Game Lobby](docs/images/250524_GameLobby.png)                       |
+| Join Game             | ![Join Game](docs/images/250524_JoinGame.png)                         |
+| Gameplay Screen       | ![Gameplay Screen](docs/images/250524_GameplayScreen.png)             |
 
 
 > Die Bilder dienen zur UI-Orientierung und können im Verlauf angepasst werden.

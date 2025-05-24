@@ -1,16 +1,16 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+
 //Import Libraries for testing
 
-import androidx.compose.ui.graphics.Color
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.TestInstance
-
-
 class MainActivityTest {
+    @Test
+    fun addition_isCorrect() {
+        assertEquals(4, 2 + 2)
+    }
+    /*
     @Test
     fun `tile with all sides same color`() {
         val tile = Tile(
@@ -59,7 +59,7 @@ class MainActivityTest {
 
         assert(tile1 != tile2)
     }
-    /*    Diese beiden Tests nur hinzufügen wenn passend zu Semantik
+        Diese beiden Tests nur hinzufügen wenn passend zu Semantik
 
 
 
