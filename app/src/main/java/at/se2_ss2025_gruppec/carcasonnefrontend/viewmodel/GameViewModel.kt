@@ -110,7 +110,31 @@ class GameViewModel constructor(
     }
 
     private fun updateBoardWithTile(tile: Tile, playerId: String?) {
+        val currentState = _uiState.value
+        if (currentState is GameUiState.Success) {
+            val position = tile.position ?: return
 
+            // Update board map with the new tile
+            val updatedBoard = currentState.gameState.board.toMutableMap()
+            updatedBoard[position] = tile
+
+            // Create new game state with updated board
+            val updatedGameState = currentState.gameState.copy(
+                board = updatedBoard,
+                currentTile = null // Clear current tile after placement
+            )
+
+            // Emit updated UI state
+            _uiState.value = GameUiState.Success(updatedGameState)
+
+            // Clear selections
+            _selectedTile.value = null
+            _currentTile.value = null
+
+            Log.d("GameViewModel", "Board updated with tile ${tile.id} at $position")
+        } else {
+            Log.e("GameViewModel", "Cannot update board - Game state is not in Success")
+        }
     }
 
 
