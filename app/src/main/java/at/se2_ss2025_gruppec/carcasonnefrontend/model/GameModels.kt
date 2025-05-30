@@ -28,13 +28,13 @@ data class Position(val x: Int, val y: Int)
 
 data class Tile(
     val id: String,
-    val terrainNorth: TerrainType,
-    val terrainEast: TerrainType,
-    val terrainSouth: TerrainType,
-    val terrainWest: TerrainType,
+    val top: String,
+    val right: String,
+    val bottom: String,
+    val left: String,
     val hasMonastery: Boolean = false,
     val hasShield: Boolean = false,
-    val rotation: TileRotation = TileRotation.NORTH,
+    val tileRotation: TileRotation = TileRotation.NORTH,
     val position: Position? = null
 )
 
