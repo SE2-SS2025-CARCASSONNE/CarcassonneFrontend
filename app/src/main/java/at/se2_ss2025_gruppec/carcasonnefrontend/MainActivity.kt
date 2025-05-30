@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
@@ -63,6 +65,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.Tile
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.TileRotation
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.bottomColor
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.getDrawableNameForTile
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.leftColor
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.topColor
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -259,6 +269,26 @@ fun LandingScreen(onStartTapped: () -> Unit) {
             )
         }
     }
+}
+@Composable
+fun TileView(tile: Tile) {
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .border(2.dp, Color.White)
+            .drawBehind {
+                val width = size.width
+                val height = size.height
+                val edge = 10f
+
+                drawRect(color = tile.topColor(), topLeft = Offset(0f, 0f), size = Size(width, edge))
+                drawRect(color = tile.rightColor(), topLeft = Offset(width - edge, 0f), size = Size(edge, height))
+                drawRect(color = tile.bottomColor(), topLeft = Offset(0f, height - edge), size = Size(width, edge))
+                drawRect(color = tile.leftColor(), topLeft = Offset(0f, 0f), size = Size(edge, height))
+
+                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
+            }
+    )
 }
 
 @Composable
@@ -558,6 +588,8 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
+                Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName") // ⬅️ Add this
+
                 Handler(Looper.getMainLooper()).post {
                     players.clear()
                     for (i in 0 until playerArray.length()) {
@@ -658,7 +690,8 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 
             for (i in 0 until maxPlayers) {
                 val playerNameInList = players.getOrNull(i) ?: "Empty Slot"
-                val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
+                val displayName =
+                    if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
 
                 Button(
                     onClick = { },
@@ -702,10 +735,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+                }
             }
         }
     }
-}
 }
 
 @Preview(showBackground = true)
@@ -716,10 +749,19 @@ fun GameplayScreenPreview() {
 
 @Composable
 fun GameplayScreen(gameId: String) {
+    val viewModel: GameViewModel = viewModel()
+    val currentTile by viewModel.currentTile
+
+    LaunchedEffect(Unit) {
+        viewModel.subscribeToGame(gameId)
+    }
+
+
     Box(modifier = Modifier.fillMaxSize()) {
         print(gameId)
 
         BackgroundImage()
+
 
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(40.dp))
@@ -767,9 +809,53 @@ fun GameplayScreen(gameId: String) {
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            val context = LocalContext.current // 👈 MOVE THIS OUTSIDE FIRST
+
+            currentTile?.let { tile ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clickable {
+                            Toast.makeText(context, "Tile ID: ${tile.id}", Toast.LENGTH_SHORT).show()
+                        }
+                        .border(2.dp, Color.Yellow, RoundedCornerShape(8.dp))
+                        .padding(4.dp)
+                ) {
+                   // TileView(tile)
+                    DrawTile(tile)
+
+
+                    Text(
+                        text = "ID: ${tile.id}",
+                        color = Color.LightGray,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(onClick = { viewModel.requestTileFromBackend(gameId, "HOST") }) {
+                    Text("Draw Tile")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { viewModel.rotateCurrentTile() }) {
+                    Text("Rotate")
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
             BottomScreenBar()
+
         }
     }
 }
@@ -1061,5 +1147,45 @@ fun parseErrorMessage(body: String?): String {
         json.getString("message")
     } catch (_: Exception) {
         "Unexpected error!"
+    }
+
+
+}
+@Composable
+fun DrawTile(tile: Tile) {
+    val context = LocalContext.current
+
+
+    val baseId = tile.id.split("-").take(2).joinToString("-") // e.g. "tile-b-1" → "tile-b"
+    val drawableName = baseId.replace("-", "_") // -> "tile"
+
+    val drawableId = remember(drawableName) {
+        context.resources.getIdentifier(drawableName, "drawable", context.packageName)
+    }
+
+    if (drawableId != 0) {
+        Image(
+            painter = painterResource(id = drawableId),
+            contentDescription = tile.id,
+            modifier = Modifier
+                .size(64.dp)
+                .graphicsLayer(
+                    rotationZ = when (tile.tileRotation) {
+                        TileRotation.NORTH -> 0f
+                        TileRotation.EAST -> 90f
+                        TileRotation.SOUTH -> 180f
+                        TileRotation.WEST -> 270f
+                    }
+                )
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .background(Color.Red),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "?", color = Color.White)
+        }
     }
 }
