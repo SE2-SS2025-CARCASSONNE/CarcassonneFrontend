@@ -1,5 +1,6 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -57,7 +58,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.AuthViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
-import at.se2_ss2025_gruppec.carcasonnefrontend.SoundManager
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import androidx.compose.ui.tooling.preview.Preview
@@ -69,7 +69,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.bottomColor
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.getDrawableNameForTile
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.leftColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.topColor
@@ -758,10 +757,7 @@ fun GameplayScreen(gameId: String) {
 
 
     Box(modifier = Modifier.fillMaxSize()) {
-        print(gameId)
-
         BackgroundImage()
-
 
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(40.dp))
@@ -788,52 +784,9 @@ fun GameplayScreen(gameId: String) {
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            val context = LocalContext.current // 👈 MOVE THIS OUTSIDE FIRST
-
-            currentTile?.let { tile ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .clickable {
-                            Toast.makeText(context, "Tile ID: ${tile.id}", Toast.LENGTH_SHORT).show()
-                        }
-                        .border(2.dp, Color.Yellow, RoundedCornerShape(8.dp))
-                        .padding(4.dp)
-                ) {
-                   // TileView(tile)
-                    DrawTile(tile)
-
-
-                    Text(
-                        text = "ID: ${tile.id}",
-                        color = Color.LightGray,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Button(onClick = { viewModel.requestTileFromBackend(gameId, "HOST") }) {
-                    Text("Draw Tile")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { viewModel.rotateCurrentTile() }) {
-                    Text("Rotate")
-                }
-            }
-
             Spacer(modifier = Modifier.height(20.dp))
 
-            BottomScreenBar()
+            BottomScreenBar(viewModel)
 
         }
     }
@@ -908,7 +861,7 @@ fun TileBackButton(
             text = "$remaining",
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
-            color = if (isEnabled) Color.White else Color.Gray,
+            color = if (isEnabled) Color.White else Color.Red,
             modifier = Modifier.align(Alignment.Center)
         )
     }
@@ -992,28 +945,9 @@ fun PannableTileGrid(
 }
 
 @Composable
-fun PlayerRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Player",
-                    tint = if (index == 0) Color.Green else Color.White,
-                    modifier = Modifier.size(30.dp)
-                )
-                Text(name, fontSize = 12.sp,
-                    color = if (index == 0) Color.Green else Color.White)
-            }
-        }
-    }
-}
+fun BottomScreenBar(viewModel: GameViewModel) {
+    val tile = viewModel.currentTile.value
 
-@Composable
-fun BottomScreenBar() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1050,13 +984,15 @@ fun BottomScreenBar() {
                 }
             }
 
-            // Platzhalter für gezogene Karte
+            // Gezogene Karte wird angezeigt
             Box(
                 modifier = Modifier.height(170.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.tile_j),
+                tile?.let {
+                    DrawTile(it, viewModel)
+                } ?: Image(
+                    painter = painterResource(id = R.drawable.tile_back),
                     contentDescription = "Demo Tile",
                     contentScale = ContentScale.FillBounds,
                     modifier = Modifier.size(135.dp)
@@ -1104,23 +1040,6 @@ fun BottomScreenBar() {
 }
 
 @Composable
-fun TileBackRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        repeat(4) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                TileBackButton(
-                    label = "18",
-                    onClick = {}
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun BackgroundImage() {
     Image(
         painter = painterResource(id = R.drawable.bg_pxart),
@@ -1160,34 +1079,6 @@ fun PixelArtButton(
     }
 }
 
-@Composable
-fun TileBackButton(
-    label: String,
-    onClick: () -> Unit,
-    backgroundRes: Int = R.drawable.tile_back
-) {
-    Box(
-        modifier = Modifier
-            .size(72.dp)
-            .clickable { onClick() }
-    ) {
-        Image(
-            painter = painterResource(id = backgroundRes),
-            contentDescription = "Tile back image",
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier.matchParentSize()
-        )
-
-        Text(
-            text = label,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-            modifier = Modifier.align(Alignment.Center)
-        )
-    }
-}
-
 //Singleton TokenManager to store JWT
 object TokenManager {
     var userToken: String? = null
@@ -1202,13 +1093,12 @@ fun parseErrorMessage(body: String?): String {
     } catch (_: Exception) {
         "Unexpected error!"
     }
-
-
 }
-@Composable
-fun DrawTile(tile: Tile) {
-    val context = LocalContext.current
 
+@SuppressLint("DiscouragedApi")
+@Composable
+fun DrawTile(tile: Tile, viewModel: GameViewModel) {
+    val context = LocalContext.current
 
     val baseId = tile.id.split("-").take(2).joinToString("-") // e.g. "tile-b-1" → "tile-b"
     val drawableName = baseId.replace("-", "_") // -> "tile"
@@ -1222,7 +1112,7 @@ fun DrawTile(tile: Tile) {
             painter = painterResource(id = drawableId),
             contentDescription = tile.id,
             modifier = Modifier
-                .size(64.dp)
+                .size(135.dp)
                 .graphicsLayer(
                     rotationZ = when (tile.tileRotation) {
                         TileRotation.NORTH -> 0f
@@ -1231,11 +1121,12 @@ fun DrawTile(tile: Tile) {
                         TileRotation.WEST -> 270f
                     }
                 )
+                .clickable(onClick = { viewModel.rotateCurrentTile() })
         )
     } else {
         Box(
             modifier = Modifier
-                .size(64.dp)
+                .size(135.dp)
                 .background(Color.Red),
             contentAlignment = Alignment.Center
         ) {
