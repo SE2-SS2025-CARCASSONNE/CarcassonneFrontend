@@ -770,34 +770,13 @@ fun GameplayScreen(gameId: String) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            TileBackRow()
+            TileBackRow(viewModel, gameId)
 
             Spacer(modifier = Modifier.height(20.dp))
 
             val tiles = remember { // Just for showcasing UI, delete later
                 listOf(
-                    TileData(x = 0, y = 0, drawableRes = R.drawable.tile_a),
-                    TileData(x = 1, y = 0, drawableRes = R.drawable.tile_b),
-                    TileData(x = 2, y = 0, drawableRes = R.drawable.tile_c),
-                    TileData(x = 4, y = 0, drawableRes = R.drawable.tile_d),
-                    TileData(x = 0, y = 1, drawableRes = R.drawable.tile_e),
-                    TileData(x = 2, y = 1, drawableRes = R.drawable.tile_f),
-                    TileData(x = 3, y = 1, drawableRes = R.drawable.tile_g),
-                    TileData(x = 4, y = 1, drawableRes = R.drawable.tile_h),
-                    TileData(x = 1, y = 2, drawableRes = R.drawable.tile_i),
-                    TileData(x = 2, y = 2, drawableRes = R.drawable.tile_j),
-                    TileData(x = 4, y = 2, drawableRes = R.drawable.tile_k),
-                    TileData(x = 0, y = 3, drawableRes = R.drawable.tile_x),
-                    TileData(x = 1, y = 3, drawableRes = R.drawable.tile_m),
-                    TileData(x = 2, y = 3, drawableRes = R.drawable.tile_n),
-                    TileData(x = 3, y = 3, drawableRes = R.drawable.tile_o),
-                    TileData(x = 0, y = 4, drawableRes = R.drawable.tile_p),
-                    TileData(x = 2, y = 4, drawableRes = R.drawable.tile_q),
-                    TileData(x = 3, y = 4, drawableRes = R.drawable.tile_r),
-                    TileData(x = 4, y = 4, drawableRes = R.drawable.tile_s),
-                    TileData(x = 1, y = 5, drawableRes = R.drawable.tile_t),
-                    TileData(x = 2, y = 5, drawableRes = R.drawable.tile_a),
-                    TileData(x = 4, y = 5, drawableRes = R.drawable.tile_b)
+                    TileData(x = 0, y = 0, drawableRes = R.drawable.tile_a)
                 )
             }
 
@@ -857,6 +836,81 @@ fun GameplayScreen(gameId: String) {
             BottomScreenBar()
 
         }
+    }
+}
+
+@Composable
+fun PlayerRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Player",
+                    tint = if (index == 0) Color.Green else Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
+                Text(name, fontSize = 12.sp,
+                    color = if (index == 0) Color.Green else Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun TileBackRow(viewModel: GameViewModel, gameId: String) {
+    val counters = remember { List(4) { mutableIntStateOf(18) } }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        repeat(4) { index ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TileBackButton(
+                    remaining = counters[index].intValue,
+                    onClick = {
+                        if (counters[index].intValue > 0) {
+                            counters[index].intValue -= 1
+                            viewModel.requestTileFromBackend(gameId, "HOST")
+                        }
+                    },
+                    isEnabled = counters[index].intValue > 0
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TileBackButton(
+    remaining: Int,
+    onClick: () -> Unit,
+    backgroundRes: Int = R.drawable.tile_back,
+    isEnabled: Boolean
+) {
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clickable(enabled = isEnabled) { onClick() }
+    ) {
+        Image(
+            painter = painterResource(id = backgroundRes),
+            contentDescription = "Tile back image",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Text(
+            text = "$remaining",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (isEnabled) Color.White else Color.Gray,
+            modifier = Modifier.align(Alignment.Center)
+        )
     }
 }
 
