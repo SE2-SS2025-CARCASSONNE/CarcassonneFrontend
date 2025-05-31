@@ -12,7 +12,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.repository.GameRepository
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
-import com.carcassonne.model.dto.PlaceTileDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -143,32 +142,6 @@ class GameViewModel constructor(
         _currentRotation.value = TileRotation.NORTH
     }
 
-    fun placeTile(position: Position) {
-        val tile = _selectedTile.value ?: return
-        val gameState = (_uiState.value as? GameUiState.Success)?.gameState ?: return
-        val playerId = gameState.players[gameState.currentPlayerIndex].id
-
-        viewModelScope.launch {
-            try {
-                val placeTileDto = PlaceTileDto(
-                    gameState.id,
-                    tile.id,
-                    position.x,
-                    position.y,
-                    _currentRotation.value
-                )
-                val success = gameRepository.placeTile(
-                    tile.id,
-                    placeTileDto
-                )
-                if (success) {
-                    _selectedTile.value = null // Clear after placement
-                }
-            } catch (e: Exception) {
-                _uiState.value = GameUiState.Error("Error placing tile: ${e.message}")
-            }
-        }
-    }
 }
 
 /**
