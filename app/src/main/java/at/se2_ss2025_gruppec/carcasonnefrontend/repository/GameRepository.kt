@@ -2,10 +2,10 @@ package at.se2_ss2025_gruppec.carcasonnefrontend.repository
 
 import android.util.Log
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
-import com.carcassonne.model.dto.GameListItemDto
-import com.carcassonne.model.dto.GameStateDto
-import com.carcassonne.model.dto.PlaceTileDto
-import com.carcassonne.network.CarcassonneApi
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.GameListItemDto
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.GameStateDto
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.PlaceTileDto
+import at.se2_ss2025_gruppec.carcasonnefrontend.network.CarcassonneApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
