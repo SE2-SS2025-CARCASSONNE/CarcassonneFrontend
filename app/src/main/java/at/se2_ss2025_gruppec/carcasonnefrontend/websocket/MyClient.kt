@@ -16,6 +16,8 @@ import org.hildan.krossbow.stomp.sendText
 import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import org.json.JSONObject
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.MeepleDto
+
 
 class MyClient(val callbacks: Callbacks) {
 
@@ -151,6 +153,29 @@ class MyClient(val callbacks: Callbacks) {
                 Log.d("WebSocket", "Join game message sent: $json")
             } catch (e: Exception) {
                 Log.e("WebSocket", "Failed to send join game: ${e.message}")
+            }
+        }
+    }
+
+    fun sendPlaceMeeple(gameId: String, playerId: String, meepleId: String, tileId: String, position: String) {
+        val json = JSONObject().apply {
+            put("type", "place_meeple")
+            put("gameId", gameId)
+            put("meeple", JSONObject().apply {
+                put("id", meepleId)
+                put("playerId", playerId)
+                put("type", "STANDARD") // Falls der Meeple-Typ benötigt wird
+                put("tileId", tileId)
+                put("position", position)
+            })
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "Meeple placement message sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send meeple placement: ${e.message}")
             }
         }
     }
