@@ -8,102 +8,200 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.Offset
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
+import androidx.compose.material.icons.filled.Settings
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.authApi
+import androidx.lifecycle.viewmodel.compose.viewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.gameApi
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.AuthViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
+import at.se2_ss2025_gruppec.carcasonnefrontend.SoundManager
 import kotlinx.coroutines.delay
 import org.json.JSONObject
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SoundManager.playMusic(this, R.raw.lobby_music)
 
         setContent {
-            val navController = rememberNavController()
-            var userToken by remember { mutableStateOf(TokenManager.userToken) }
+            Box(modifier = Modifier.fillMaxSize()) {
+                val navController = rememberNavController()
+                var userToken by remember { mutableStateOf(TokenManager.userToken) }
 
-            val stompClient by remember(userToken) { //Remember stompClient across recompositions, unless userToken changes
-                mutableStateOf(TokenManager.userToken?.let { //Init of stompClient only after authentication (= when userToken not null)
-                    MyClient(object : Callbacks {
-                        override fun onResponse(res: String) {
-                            Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
+                val stompClient by remember(userToken) {
+                    mutableStateOf(TokenManager.userToken?.let {
+                        MyClient(object : Callbacks {
+                            override fun onResponse(res: String) {
+                                Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
+                            }
+                        }).apply { connect() }
+                    })
+                }
+
+                NavHost(navController = navController, startDestination = "landing") {
+                    composable("landing") { LandingScreen(onStartTapped = {
+                        navController.navigate("auth") {
+                            popUpTo("landing") { inclusive = true }
                         }
-                    }).apply { connect() }
-                })
-            }
+                    })}
+                    composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
+                        TokenManager.userToken = jwtToken
+                        userToken = jwtToken
+                        navController.navigate("main") {
+                            popUpTo("auth") { inclusive = true }
+                        }
+                    })}
+                    composable("main") { MainScreen(navController) }
+                    composable("join_game") { JoinGameScreen(navController) }
+                    composable("create_game") { CreateGameScreen(navController) }
+                    composable("lobby/{gameId}") { backStackEntry ->
+                        val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
+                        val playerName = TokenManager.loggedInUsername ?: "Unknown"
 
-            NavHost(navController = navController, startDestination = "landing") {
-                composable("landing") { LandingScreen(onStartTapped = {
-                    navController.navigate("auth") {
-                        popUpTo("landing") { inclusive = true }
+                        stompClient?.let {
+                            LobbyScreen(gameId = gameId, playerName = playerName, stompClient = it, navController = navController)
+                        } ?: run {
+                            Log.e("MainActivity", "No stomp client available to show lobby")
+                            Toast.makeText(this@MainActivity, "Connection not ready!", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                })}
-                composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
-                    TokenManager.userToken = jwtToken //Store JWT in Singleton for persistence and easy access
-                    userToken = jwtToken //Triggers recomposition to init stompClient
-                    navController.navigate("main") {
-                        popUpTo("auth") { inclusive = true } //Lock user out of auth screen after authentication
-                    }
-                })}
-                composable("main") { MainScreen(navController) }
-                composable("join_game") { JoinGameScreen(navController) }
-                composable("create_game") { CreateGameScreen(navController) }
-
-                composable("lobby/{gameId}/{playerCount}/{playerName}") { backStackEntry ->
-                    val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-                    val playerCount = backStackEntry.arguments?.getString("playerCount")?.toIntOrNull() ?: 2
-                    val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
-
-                    stompClient?.let {
-                        LobbyScreen(
-                            gameId = gameId,
-                            playerName = playerName,
-                            playerCount = playerCount,
-                            stompClient = it,
-                            navController = navController
-                        )
-                    } ?: run {
-                        Log.e("MainActivity", "No stomp client available to show lobby")
-                        Toast.makeText(this@MainActivity, "Connection not ready!", Toast.LENGTH_SHORT).show()
+                    composable("gameplay/{gameId}") { backStackEntry ->
+                        val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
+                        GameplayScreen(gameId)
                     }
                 }
-                composable("gameplay/{gameId}") { backStackEntry ->
-                    val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-                    GameplayScreen(gameId)
+                GlobalSoundMenu()
+            }
+        }
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        SoundManager.stopMusic()
+    }
+}
+@Composable
+fun GlobalSoundMenu() {
+    var showVolumeControl by remember { mutableStateOf(false) }
+    var volumeLevel by remember { mutableStateOf(0.5f) }
+    var isMuted by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Top-right floating gear icon
+        IconButton(
+            onClick = { showVolumeControl = !showVolumeControl },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Settings",
+                tint = Color.White,
+                modifier = Modifier.size(46.dp)
+            )
+        }
+
+        if (showVolumeControl) {
+            // Transparent full-screen dismiss layer
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Transparent)
+                    .clickable { showVolumeControl = false } // click outside = close
+            )
+
+            // Settings popup on top
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 64.dp, end = 16.dp)
+                    .background(Color(0xCC5A3A1A), shape = RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Music Volume", color = Color.White)
+                    Slider(
+                        value = if (isMuted) 0f else volumeLevel,
+                        onValueChange = {
+                            volumeLevel = it
+                            isMuted = it == 0f
+                            SoundManager.setVolume(it)
+                        },
+                        valueRange = 0f..1f,
+                        steps = 5,
+                        modifier = Modifier.width(120.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Color.Yellow,
+                            inactiveTrackColor = Color.Gray
+                        )
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                isMuted = true
+                                SoundManager.setVolume(0f)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A4A2A))
+                        ) {
+                            Text("Mute", color = Color.White)
+                        }
+                        Button(
+                            onClick = {
+                                isMuted = false
+                                SoundManager.setVolume(volumeLevel)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A4A2A))
+                        ) {
+                            Text("Unmute", color = Color.White)
+                        }
+                    }
                 }
             }
         }
@@ -135,12 +233,7 @@ fun LandingScreen(onStartTapped: () -> Unit) {
             .fillMaxSize()
             .clickable { onStartTapped() } //Make entire screen clickable (= tap anywhere to continue)
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -169,64 +262,21 @@ fun LandingScreen(onStartTapped: () -> Unit) {
 }
 
 @Composable
-fun AuthScreen(onAuthSuccess: (String) -> Unit) {
+fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewModel()
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isLoading by remember { (mutableStateOf(false)) }
+    var username = viewModel.username
+    var password = viewModel.password
+    var isLoading = viewModel.isLoading
 
-    fun login(username: String, password: String) {
-        isLoading = true
-
-        coroutineScope.launch {
-            val request = LoginRequest(username, password)
-            try {
-                val response = authApi.login(request) //Store TokenResponse in val response
-                TokenManager.userToken = response.token
-                onAuthSuccess(response.token) //Pass actual JWT string to onAuthSuccess
-            } catch (e: retrofit2.HttpException) { //Catch HTTP-specific exceptions
-                val errorBody = e.response()?.errorBody()?.string() //Get raw error body from HTTP response
-                val errorMsg = parseErrorMessage(errorBody) //Parse actual message from error body JSON
-                isLoading = false
-                Toast.makeText(context, "Login failed: $errorMsg", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) { //Catch-all for other exceptions
-                isLoading = false
-                Toast.makeText(context, "Login failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
-    fun register(username: String, password: String) {
-        isLoading = true
-
-        coroutineScope.launch {
-            val request = RegisterRequest(username, password)
-            try {
-                authApi.register(request) //Success message easier to handle here, no need to store HTTP 201 from backend
-                isLoading = false
-                Toast.makeText(context, "Registration successful!", Toast.LENGTH_SHORT).show()
-            } catch (e: retrofit2.HttpException) {
-                val errorBody = e.response()?.errorBody()?.string()
-                val errorMsg = parseErrorMessage(errorBody)
-                isLoading = false
-                Toast.makeText(context, "Registration failed: $errorMsg", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                isLoading = false
-                Toast.makeText(context, "Registration failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+    LaunchedEffect(true) {
+        viewModel.uiEvents.collect { message -> // Collect messages from ViewModel
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
     Box (modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop, //Maintains aspect ratio (FillBounds causes warping!)
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Box(
             modifier = Modifier
@@ -239,7 +289,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
             ) {
                 OutlinedTextField( //Username input
                     value = username,
-                    onValueChange = { username = it },
+                    onValueChange = { viewModel.username = it },
                     label = { Text("Username") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -256,7 +306,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
 
                 OutlinedTextField( //Password input
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { viewModel.password = it },
                     label = { Text("Password") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
@@ -276,7 +326,10 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                     label = if (isLoading) "Logging in..." else "Login", //Simple loading indicator
                     onClick = {
                         if (!isLoading) {
-                            login(username, password)
+                            viewModel.login { jwt ->
+                                TokenManager.loggedInUsername = viewModel.username
+                                onAuthSuccess(jwt)
+                            }
                         }
                     }
                 )
@@ -286,7 +339,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
                     label = if (isLoading) "Registering..." else "Register",
                     onClick = {
                         if (!isLoading) {
-                            register(username, password)
+                            viewModel.register()
                         }
                     }
                 )
@@ -306,18 +359,12 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit) {
 @Composable
 fun MainScreen(navController: NavController) {
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-        )
+        BackgroundImage()
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 240.dp),
+                .padding(bottom = 320.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -343,16 +390,10 @@ fun MainScreen(navController: NavController) {
 fun JoinGameScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
     var gameId by remember { mutableStateOf("") }
-    var playerName by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Box(
             modifier = Modifier
@@ -386,38 +427,19 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                     )
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = playerName,
-                    onValueChange = { playerName = it },
-                    label = { Text("Enter your name") },
-                    modifier = Modifier.width(220.dp),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFFFF4C2),
-                        textAlign = TextAlign.Center
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.White,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    )
-                )
-
                 Spacer(modifier = Modifier.height(50.dp))
 
                 PixelArtButton(
                     label = "Join",
                     onClick = {
-                        if (gameId.isBlank() || playerName.isBlank()) {
-                            Toast.makeText(context, "Enter game ID and player name", Toast.LENGTH_SHORT).show()
+                        if (gameId.isBlank()) {
+                            Toast.makeText(context, "Please enter a game ID", Toast.LENGTH_SHORT).show()
+                            return@PixelArtButton
+                        }
+
+                        val username = TokenManager.loggedInUsername
+                        if (username.isNullOrBlank()) {
+                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
                             return@PixelArtButton
                         }
 
@@ -427,12 +449,11 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                                     ?: throw IllegalStateException("Token is required, but was null!")
 
                                 val gameState = gameApi.getGame(
-                                    token = "Bearer $token", // Append JWT to API call
+                                    token = "Bearer $token",
                                     gameId = gameId
                                 )
                                 val playerCount = gameState.players.size.coerceAtLeast(2)
-
-                                navController.navigate("lobby/$gameId/$playerCount/$playerName")
+                                navController.navigate("lobby/$gameId")
                             } catch (e: Exception) {
                                 Log.e("JoinGame", "Exception during getGame: ${e.message}", e)
                                 Toast.makeText(context, "Game not found or connection failed: ${e.message}", Toast.LENGTH_LONG).show()
@@ -448,53 +469,20 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 @Composable
 fun CreateGameScreen(navController: NavController) {
     var selectedPlayers by remember { mutableStateOf(2) }
-    var playerName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-        )
+        BackgroundImage()
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 210.dp),
+                .padding(bottom = 320.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                //Name input field
-                OutlinedTextField(
-                    value = playerName,
-                    onValueChange = { playerName = it },
-                    label = { Text("Enter your name") },
-                    modifier = Modifier.width(220.dp),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFFFF4C2),
-                        textAlign = TextAlign.Center
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.White,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(48.dp)) // Added some spacing since we removed the input field
 
                 Text(
                     text = "Select Player Count:",
@@ -525,10 +513,8 @@ fun CreateGameScreen(navController: NavController) {
                 PixelArtButton(
                     label = "Create",
                     onClick = {
-                        val hostName = playerName.trim()
-                        if (hostName.isEmpty()) {
-                            Toast.makeText(context, "Please enter your name", Toast.LENGTH_SHORT).show()
-                            return@PixelArtButton
+                        val hostName = TokenManager.loggedInUsername ?: return@PixelArtButton.also {
+                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
                         }
 
                         coroutineScope.launch {
@@ -540,7 +526,7 @@ fun CreateGameScreen(navController: NavController) {
                                     request = CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
                                 Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
-                                navController.navigate("lobby/${response.gameId}/$selectedPlayers/$hostName")
+                                navController.navigate("lobby/${response.gameId}")
 
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
@@ -554,15 +540,45 @@ fun CreateGameScreen(navController: NavController) {
 }
 
 @Composable
-fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompClient: MyClient, navController: NavController) {
+fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
     val players = remember { mutableStateListOf(playerName) }
+    val hostName = remember { mutableStateOf("") }
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+
+    fun handleLobbyMessage(message: String) {
+        Log.d("WebSocket", "Received message: $message")
+        val json = JSONObject(message)
+        when (json.getString("type")) {
+            "game_started" -> {
+                Handler(Looper.getMainLooper()).post {
+                    navController.navigate("gameplay/$gameId")
+                }
+            }
+            "player_joined" -> {
+                val playerArray = json.getJSONArray("players")
+                val host = json.optString("host", "")
+                Handler(Looper.getMainLooper()).post {
+                    players.clear()
+                    for (i in 0 until playerArray.length()) {
+                        players.add(playerArray.getString(i))
+                    }
+                    hostName.value = host
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (!stompClient.isConnected()) {
             delay(100)
         }
+
+        //Subscribe to both public and private channels
+        stompClient.listenOn("/topic/game/$gameId") { handleLobbyMessage(it) }
+        stompClient.listenOn("/user/queue/private") { handleLobbyMessage(it) }
+        delay(700) //In order to give time for subscription to happen
+        //Send join AFTER subscriptions
         try {
             Log.d("LobbyScreen", "Sending join_game for $playerName to $gameId")
             stompClient.sendJoinGame(gameId, playerName)
@@ -570,39 +586,13 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
             Log.e("LobbyScreen", "Failed to send join_game: ${e.message}")
             Toast.makeText(context, "Failed to join game: ${e.message}", Toast.LENGTH_LONG).show()
         }
-        stompClient.listenOn("/topic/game/$gameId") { message ->
-            Log.d("WebSocket", "Received message: $message")
-            val json = JSONObject(message)
-            when (json.getString("type")) {
-                "game_started" -> {
-                    Handler(Looper.getMainLooper()).post {
-                        navController.navigate("gameplay/$gameId")
-                    }
-                }
-                "player_joined" -> {
-                    val playerArray = json.getJSONArray("players")
-                    Handler(Looper.getMainLooper()).post {
-                        players.clear()
-                        for (i in 0 until playerArray.length()) {
-                            players.add(playerArray.getString(i))
-                        }
-                        Log.d("Lobby", "Updated players in lobby: $players")
-                    }
-                }
-            }
-        }
     }
 
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.bg_pxart),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        BackgroundImage()
 
         Text(
             text = "Lobby",
@@ -664,9 +654,10 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
             )
             Spacer(modifier = Modifier.height(24.dp))
 
-            for (i in 1..playerCount) {
-                val playerNameInList = players.getOrNull(i - 1) ?: "Empty Slot"
-                Log.d("LobbyScreen", "Checking: [$playerNameInList] vs [$playerName]")
+            val maxPlayers = 4
+
+            for (i in 0 until maxPlayers) {
+                val playerNameInList = players.getOrNull(i) ?: "Empty Slot"
                 val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
 
                 Button(
@@ -693,215 +684,310 @@ fun LobbyScreen(gameId: String, playerName: String, playerCount: Int = 2, stompC
 
             Spacer(modifier = Modifier.height(68.dp))
 
-            Button(
-                onClick = {
-                    Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
-                    stompClient.sendStartGame(gameId)
-                },
-                modifier = Modifier
-                    .width(200.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC5A3A1A))
-            ) {
-                Text(
-                    text = "Start Game",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+            if (hostName.value == playerName) {
+                Button(
+                    onClick = {
+                        Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
+                        stompClient.sendStartGame(gameId)
+                    },
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC5A3A1A))
+                ) {
+                    Text(
+                        text = "Start Game",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
             }
         }
     }
 }
-
-//Singleton TokenManager to store JWT
-object TokenManager {
-    var userToken: String? = null
 }
 
-//Custom parser to parse HTTP error messages returned by backend
-fun parseErrorMessage(body: String?): String {
-    return try {
-        val json = JSONObject(body ?: "")
-        json.getString("message")
-    } catch (_: Exception) {
-        "Unexpected error!"
-    }
-}
-
-data class Tile(
-    val top: Color,
-    val right: Color,
-    val bottom: Color,
-    val left: Color
-) {
-    fun rotated(): Tile {
-        return Tile(
-            top = left,
-            right = top,
-            bottom = right,
-            left = bottom
-        )
-    }
-}
-
-fun generateRandomTile(): Tile {
-    val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow)
-    return Tile(
-        top = colors.random(),
-        right = colors.random(),
-        bottom = colors.random(),
-        left = colors.random()
-    )
-}
-
-fun canPlaceTile(
-    grid: List<List<Tile?>>, x: Int, y: Int, tile: Tile
-): Boolean {
-    val top = if (y > 0) grid[y - 1][x] else null
-    val bottom = if (y < grid.size - 1) grid[y + 1][x] else null
-    val left = if (x > 0) grid[y][x - 1] else null
-    val right = if (x < grid[y].size - 1) grid[y][x + 1] else null
-
-    if (top == null && bottom == null && left == null && right == null) return false
-
-    return (top == null || top.bottom == tile.top) &&
-            (bottom == null || bottom.top == tile.bottom) &&
-            (left == null || left.right == tile.left) &&
-            (right == null || right.left == tile.right)
-}
-
+@Preview(showBackground = true)
 @Composable
-fun TileView(tile: Tile) {
-    Box(
-        modifier = Modifier
-            .size(64.dp)
-            .border(2.dp, Color.White)
-            .drawBehind {
-                val width = size.width
-                val height = size.height
-                val edge = 10f
-
-                drawRect(color = tile.top, topLeft = Offset(0f, 0f), size = Size(width, edge))
-                drawRect(
-                    color = tile.right,
-                    topLeft = Offset(width - edge, 0f),
-                    size = Size(edge, height)
-                )
-                drawRect(
-                    color = tile.bottom,
-                    topLeft = Offset(0f, height - edge),
-                    size = Size(width, edge)
-                )
-                drawRect(color = tile.left, topLeft = Offset(0f, 0f), size = Size(edge, height))
-                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
-            }
-    )
+fun GameplayScreenPreview() {
+    GameplayScreen("123")
 }
 
 @Composable
 fun GameplayScreen(gameId: String) {
-    val gridSize = 5
-    val grid = remember {
-        mutableStateListOf<MutableList<Tile?>>().apply {
-            repeat(gridSize) {
-                add(MutableList(gridSize) { null })
+    Box(modifier = Modifier.fillMaxSize()) {
+        print(gameId)
+
+        BackgroundImage()
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            Spacer(modifier = Modifier.height(40.dp))
+
+            PlayerRow()
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            TileBackRow()
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            val tiles = remember { // Just for showcasing UI, delete later
+                listOf(
+                    TileData(x = 0, y = 0, drawableRes = R.drawable.tile_a),
+                    TileData(x = 1, y = 0, drawableRes = R.drawable.tile_b),
+                    TileData(x = 2, y = 0, drawableRes = R.drawable.tile_c),
+                    TileData(x = 4, y = 0, drawableRes = R.drawable.tile_d),
+                    TileData(x = 0, y = 1, drawableRes = R.drawable.tile_e),
+                    TileData(x = 2, y = 1, drawableRes = R.drawable.tile_f),
+                    TileData(x = 3, y = 1, drawableRes = R.drawable.tile_g),
+                    TileData(x = 4, y = 1, drawableRes = R.drawable.tile_h),
+                    TileData(x = 1, y = 2, drawableRes = R.drawable.tile_i),
+                    TileData(x = 2, y = 2, drawableRes = R.drawable.tile_j),
+                    TileData(x = 4, y = 2, drawableRes = R.drawable.tile_k),
+                    TileData(x = 0, y = 3, drawableRes = R.drawable.tile_x),
+                    TileData(x = 1, y = 3, drawableRes = R.drawable.tile_m),
+                    TileData(x = 2, y = 3, drawableRes = R.drawable.tile_n),
+                    TileData(x = 3, y = 3, drawableRes = R.drawable.tile_o),
+                    TileData(x = 0, y = 4, drawableRes = R.drawable.tile_p),
+                    TileData(x = 2, y = 4, drawableRes = R.drawable.tile_q),
+                    TileData(x = 3, y = 4, drawableRes = R.drawable.tile_r),
+                    TileData(x = 4, y = 4, drawableRes = R.drawable.tile_s),
+                    TileData(x = 1, y = 5, drawableRes = R.drawable.tile_t),
+                    TileData(x = 2, y = 5, drawableRes = R.drawable.tile_a),
+                    TileData(x = 4, y = 5, drawableRes = R.drawable.tile_b)
+                )
             }
-            this[gridSize / 2][gridSize / 2] = generateRandomTile() // center tile
+
+            PannableTileGrid(
+                tiles = tiles,
+                onTileClick = { x, y ->
+                    println("Tapped tile at ($x, $y)")
+                },
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            BottomScreenBar()
         }
     }
+}
+
+data class TileData(
+    val x: Int,
+    val y: Int,
+    val drawableRes: Int? = null
+)
+
+@Composable
+fun PannableTileGrid(
+    tiles: List<TileData>,
+    onTileClick: (Int, Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val tileSize = 100.dp
+    val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
     val context = LocalContext.current
-    val currentTile = remember { mutableStateOf(generateRandomTile()) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    val scale = remember { mutableFloatStateOf(1f) }
+    val offsetX = remember { mutableFloatStateOf(0f) }
+    val offsetY = remember { mutableFloatStateOf(0f) }
+    val imageCache = remember { mutableMapOf<Int, ImageBitmap>() }
+
+    val gestureModifier = Modifier
+        .pointerInput(Unit) {
+            detectTransformGestures { _, pan, zoom, _ ->
+                scale.floatValue *= zoom
+                offsetX.floatValue += pan.x
+                offsetY.floatValue += pan.y
+            }
+        }
+        .pointerInput(Unit) {
+            detectTapGestures { offset ->
+                val tileSizePxScaled = tileSizePx * scale.floatValue
+                val x = ((offset.x - offsetX.floatValue) / tileSizePxScaled).toInt()
+                val y = ((offset.y - offsetY.floatValue) / tileSizePxScaled).toInt()
+                onTileClick(x, y)
+            }
+        }
+
+    Box(
+        modifier = modifier
+            .clipToBounds()
+            .then(gestureModifier)
     ) {
-        Text(
-            text = "Game ID: $gameId",
-            color = Color.White,
-            fontSize = 20.sp,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val scaledTileSizePx = tileSizePx * scale.floatValue
 
-        //Grid
-        Column {
-            for (y in 0 until gridSize) {
-                Row {
-                    for (x in 0 until gridSize) {
-                        val tile = grid[y][x]
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .padding(2.dp)
-                                .background(Color.DarkGray)
-                                .clickable {
-                                    if (tile == null && canPlaceTile(
-                                            grid,
-                                            x,
-                                            y,
-                                            currentTile.value
-                                        )
-                                    ) {
-                                        grid[y][x] = currentTile.value
-                                        currentTile.value = generateRandomTile()
-                                    } else {
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                "Can't place tile here",
-                                                Toast.LENGTH_SHORT
-                                            )
-                                            .show()
-                                    }
-                                }
-                        ) {
-                            tile?.let {
-                                TileView(it)
-                            }
-                        }
+            tiles.forEach { tile ->
+                val x = tile.x
+                val y = tile.y
+                val left = x * scaledTileSizePx + offsetX.floatValue
+                val top = y * scaledTileSizePx + offsetY.floatValue
+
+                val image = tile.drawableRes?.let { resId ->
+                    imageCache.getOrPut(resId) {
+                        ContextCompat.getDrawable(context, resId)?.toBitmap()
+                            ?.asImageBitmap() ?: ImageBitmap(1, 1)
+                    }
+                }
+
+                if (image != null) {
+                    drawImage(
+                        image = image,
+                        dstOffset = IntOffset(left.toInt(), top.toInt()),
+                        dstSize = IntSize(scaledTileSizePx.toInt(), scaledTileSizePx.toInt())
+                    )
+                } else {
+                    drawRect(
+                        color = Color.Gray,
+                        topLeft = Offset(left, top),
+                        size = Size(scaledTileSizePx, scaledTileSizePx)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlayerRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Player",
+                    tint = if (index == 0) Color.Green else Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
+                Text(name, fontSize = 12.sp,
+                    color = if (index == 0) Color.Green else Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun BottomScreenBar() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp) // Höhe so bemessen, dass Badge und Karte Platz haben
+    ) {
+        // Meeple-Icon links, Spacer, Karte+Badge rechts
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Linke Seite: Meeple + Count unterhalb
+            Box(
+                modifier = Modifier.size(100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.meeple_blu),
+                        contentDescription = "Meeple",
+                        modifier = Modifier.size(65.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "8x",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            // Platzhalter für gezogene Karte
+            Box(
+                modifier = Modifier.height(170.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.tile_j),
+                    contentDescription = "Demo Tile",
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.size(135.dp)
+                )
+            }
+
+            // Rechte Seite: Karte + Punkt-Badge
+            Box(
+                modifier = Modifier.size(110.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Karten-Rückseite
+                    Image(
+                        painter = painterResource(id = R.drawable.tile_back),
+                        contentDescription = "Tile Back",
+                        contentScale = ContentScale.FillBounds,
+                        modifier = Modifier.size(65.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(13.dp))
+
+                    // Punkte-Badge unten an der Karte
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = Color.White,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 25.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "10P",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
                     }
                 }
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text("Next Tile:", color = Color.White)
-        TileView(currentTile.value)
-        Button(
-            onClick = {
-                currentTile.value = generateRandomTile()
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Gray,
-                contentColor = Color.White
-            ),
-            modifier = Modifier
-                .padding(top = 12.dp)
-        ) {
-            Text("Skip Tile")
-        }
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Button(
-            onClick = {
-                currentTile.value = currentTile.value.rotated()
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Gray,
-                contentColor = Color.White
-            ),
-            modifier = Modifier
-                .padding(top = 12.dp)
-        ) {
-            Text("Rotate Tile")
+@Composable
+fun TileBackRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        repeat(4) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TileBackButton(
+                    label = "18",
+                    onClick = {}
+                )
+            }
         }
     }
+}
+
+@Composable
+fun BackgroundImage() {
+    Image(
+        painter = painterResource(id = R.drawable.bg_pxart),
+        contentDescription = null,
+        contentScale = ContentScale.Crop, // Maintains aspect ratio & prevents warping
+        modifier = Modifier.fillMaxSize()
+    )
 }
 
 @Composable
@@ -934,41 +1020,46 @@ fun PixelArtButton(
     }
 }
 
-/*
 @Composable
-fun StyledGameButton(
+fun TileBackButton(
     label: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    backgroundRes: Int = R.drawable.tile_back
 ) {
-    Button(
-        onClick = onClick,
+    Box(
         modifier = Modifier
-            .width(240.dp)
-            .height(64.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xCC5A3A1A)
-        ),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 6.dp,
-            pressedElevation = 2.dp,
-            focusedElevation = 8.dp
-        ),
-        contentPadding = PaddingValues()
+            .size(72.dp)
+            .clickable { onClick() }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.5.sp,
-                color = Color(0xFFFFF4C2)
-            )
-        }
+        Image(
+            painter = painterResource(id = backgroundRes),
+            contentDescription = "Tile back image",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Text(
+            text = label,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+            modifier = Modifier.align(Alignment.Center)
+        )
     }
-} */
+}
+
+//Singleton TokenManager to store JWT
+object TokenManager {
+    var userToken: String? = null
+    var loggedInUsername: String? = null
+}
+
+//Custom parser to parse HTTP error messages returned by backend
+fun parseErrorMessage(body: String?): String {
+    return try {
+        val json = JSONObject(body ?: "")
+        json.getString("message")
+    } catch (_: Exception) {
+        "Unexpected error!"
+    }
+}
