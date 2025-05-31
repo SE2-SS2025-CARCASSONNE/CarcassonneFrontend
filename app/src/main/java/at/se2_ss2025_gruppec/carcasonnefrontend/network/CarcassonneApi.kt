@@ -1,6 +1,7 @@
-package com.carcassonne.network
+package at.se2_ss2025_gruppec.carcasonnefrontend.network
 
-import com.carcassonne.model.dto.*
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.GameStateDto
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.PlaceTileDto
 import retrofit2.Response
 import retrofit2.http.*
 

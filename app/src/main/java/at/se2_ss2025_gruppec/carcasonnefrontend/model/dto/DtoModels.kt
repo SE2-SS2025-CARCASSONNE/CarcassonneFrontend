@@ -1,4 +1,4 @@
-package com.carcassonne.model.dto
+package at.se2_ss2025_gruppec.carcasonnefrontend.model.dto
 
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 
