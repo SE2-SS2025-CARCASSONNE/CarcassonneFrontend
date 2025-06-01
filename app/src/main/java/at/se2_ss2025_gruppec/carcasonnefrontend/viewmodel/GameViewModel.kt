@@ -7,24 +7,18 @@ import androidx.annotation.RequiresApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONObject
-
-enum class TileRotation {
-    NORTH, EAST, SOUTH, WEST
-}
-
-data class Tile(
-    val id: String,
-    val top: String,
-    val right: String,
-    val bottom: String,
-    val left: String,
-    val hasShield: Boolean = false,
-    val hasMonastery: Boolean = false,
-    val tileRotation: TileRotation = TileRotation.NORTH
-)
 
 fun getDrawableNameForTile(tile: Tile): String {
     val baseId = tile.id.substringBefore("-")
@@ -52,15 +46,30 @@ class GameViewModel : ViewModel() {
     private val _currentTile = mutableStateOf<Tile?>(null)
     val currentTile: State<Tile?> get() = _currentTile
 
+    private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
+    val uiState: StateFlow<GameUiState> = _uiState
+
+    private val _selectedTile = MutableStateFlow<Tile?>(null)
+    val selectedTile: StateFlow<Tile?> = _selectedTile
+
+    private val _currentRotation = MutableStateFlow(TileRotation.NORTH)
+    val currentRotation: StateFlow<TileRotation> = _currentRotation
+
+    private val _selectedMeeple = MutableStateFlow<Meeple?>(null)
+    val selectedMeeple: StateFlow<Meeple?> = _selectedMeeple
+
     private lateinit var webSocketClient: MyClient
 
     init {
-        webSocketClient = MyClient(object : Callbacks {
-            override fun onResponse(msg: String) {
-                handleWebSocketMessage(msg)
-            }
-        })
-        webSocketClient.connect()
+        viewModelScope.launch {
+            webSocketClient = MyClient(object : Callbacks {
+                override fun onResponse(msg: String) {
+                    handleWebSocketMessage(msg)
+                }
+
+            })
+            webSocketClient.connect()
+        }
     }
 
     fun subscribeToGame(gameId: String) {
@@ -74,8 +83,9 @@ class GameViewModel : ViewModel() {
             webSocketClient.sendDrawTileRequest(gameId, playerId)
         } else {
             Log.e("WebSocket", "Not connected yet, can't draw tile.")
-        }
+        }        
     }
+
     private fun handleWebSocketMessage(msg: String) {
         try {
             val json = JSONObject(msg)
@@ -86,6 +96,35 @@ class GameViewModel : ViewModel() {
                     val tileJson = json.getJSONObject("tile")
                     val tile = parseTileFromJson(tileJson)
                     onTileDrawn(tile)
+                }
+                "board_update" -> {
+                    try {
+                        // Extract tile information from the payload
+                        val tileJson = json.getJSONObject("tile")
+                        val placedTile = parseTileFromJson(tileJson)
+
+                        // Extract player information if needed
+                        val playerJson = json.optJSONObject("player")
+                        val playerId = playerJson?.getString("id")
+
+                        // Extract position information
+                        val position = Position(
+                            x = tileJson.getInt("x"),
+                            y = tileJson.getInt("y")
+                        )
+
+                        // Create updated tile with position
+                        val tileWithPosition = placedTile.copy(position = position)
+
+                        // Update the board state
+                        updateBoardWithTile(tileWithPosition, playerId)
+
+                        Log.d("WebSocket", "Board updated with tile: ${placedTile.id} at position ($position.x, $position.y)")
+
+                    } catch (e: Exception) {
+                        Log.e("WebSocket", "Failed to process board_update: ${e.message}")
+                        _uiState.value = GameUiState.Error("Failed to update board: ${e.message}")
+                    }
                 }
 
                 "error" -> {
@@ -105,7 +144,6 @@ class GameViewModel : ViewModel() {
             Log.e("WebSocket", "Failed to parse WebSocket message: ${e.message}")
         }
     }
-
 
     fun onTileDrawn(tile: Tile) {
         _currentTile.value = tile
@@ -217,4 +255,48 @@ class GameViewModel : ViewModel() {
         Log.d("WebSocket", "Current tile cleared due to no playable tiles")
     }
 
+    private fun updateBoardWithTile(tile: Tile, playerId: String?) {
+        val currentState = _uiState.value
+        if (currentState is GameUiState.Success) {
+            val position = tile.position ?: return
+
+            // Update board map with the new tile
+            val updatedBoard = currentState.gameState.board.toMutableMap()
+            updatedBoard[position] = tile
+
+            // Create new game state with updated board
+            val updatedGameState = currentState.gameState.copy(
+                board = updatedBoard,
+                currentTile = null // Clear current tile after placement
+            )
+
+            // Emit updated UI state
+            _uiState.value = GameUiState.Success(updatedGameState)
+
+            // Clear selections
+            _selectedTile.value = null
+            _currentTile.value = null
+
+            Log.d("GameViewModel", "Board updated with tile ${tile.id} at $position")
+        } else {
+            Log.e("GameViewModel", "Cannot update board - Game state is not in Success")
+        }
+    }
+
+
+    fun selectTile(tile: Tile) {
+        _selectedTile.value = tile
+        _currentRotation.value = TileRotation.NORTH
+    }
+
+}
+
+/**
+ * UI State to handle frontend screen behavior
+ */
+sealed class GameUiState {
+    object Loading : GameUiState()
+    object Idle : GameUiState()
+    data class Success(val gameState: GameState) : GameUiState()
+    data class Error(val message: String) : GameUiState()
 }
