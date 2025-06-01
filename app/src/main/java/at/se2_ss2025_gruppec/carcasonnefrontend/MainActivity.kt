@@ -66,8 +66,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.Tile
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.TileRotation
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.bottomColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.leftColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
