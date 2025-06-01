@@ -1,5 +1,6 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -45,6 +46,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
@@ -55,7 +58,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.AuthViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
-import at.se2_ss2025_gruppec.carcasonnefrontend.SoundManager
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import androidx.compose.ui.tooling.preview.Preview
@@ -63,6 +65,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.bottomColor
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.leftColor
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.topColor
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -259,6 +268,26 @@ fun LandingScreen(onStartTapped: () -> Unit) {
             )
         }
     }
+}
+@Composable
+fun TileView(tile: Tile) {
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .border(2.dp, Color.White)
+            .drawBehind {
+                val width = size.width
+                val height = size.height
+                val edge = 10f
+
+                drawRect(color = tile.topColor(), topLeft = Offset(0f, 0f), size = Size(width, edge))
+                drawRect(color = tile.rightColor(), topLeft = Offset(width - edge, 0f), size = Size(edge, height))
+                drawRect(color = tile.bottomColor(), topLeft = Offset(0f, height - edge), size = Size(width, edge))
+                drawRect(color = tile.leftColor(), topLeft = Offset(0f, 0f), size = Size(edge, height))
+
+                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
+            }
+    )
 }
 
 @Composable
@@ -558,6 +587,8 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
+                Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName") // ⬅️ Add this
+
                 Handler(Looper.getMainLooper()).post {
                     players.clear()
                     for (i in 0 until playerArray.length()) {
@@ -658,7 +689,8 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 
             for (i in 0 until maxPlayers) {
                 val playerNameInList = players.getOrNull(i) ?: "Empty Slot"
-                val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
+                val displayName =
+                    if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
 
                 Button(
                     onClick = { },
@@ -702,10 +734,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
+                }
             }
         }
     }
-}
 }
 
 @Preview(showBackground = true)
@@ -716,9 +748,15 @@ fun GameplayScreenPreview() {
 
 @Composable
 fun GameplayScreen(gameId: String) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        print(gameId)
+    val viewModel: GameViewModel = viewModel()
+    val currentTile by viewModel.currentTile
 
+    LaunchedEffect(Unit) {
+        viewModel.subscribeToGame(gameId)
+    }
+
+
+    Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
 
         Column(modifier = Modifier.fillMaxSize()) {
@@ -728,34 +766,13 @@ fun GameplayScreen(gameId: String) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            TileBackRow()
+            TileBackRow(viewModel, gameId)
 
             Spacer(modifier = Modifier.height(20.dp))
 
             val tiles = remember { // Just for showcasing UI, delete later
                 listOf(
-                    TileData(x = 0, y = 0, drawableRes = R.drawable.tile_a),
-                    TileData(x = 1, y = 0, drawableRes = R.drawable.tile_b),
-                    TileData(x = 2, y = 0, drawableRes = R.drawable.tile_c),
-                    TileData(x = 4, y = 0, drawableRes = R.drawable.tile_d),
-                    TileData(x = 0, y = 1, drawableRes = R.drawable.tile_e),
-                    TileData(x = 2, y = 1, drawableRes = R.drawable.tile_f),
-                    TileData(x = 3, y = 1, drawableRes = R.drawable.tile_g),
-                    TileData(x = 4, y = 1, drawableRes = R.drawable.tile_h),
-                    TileData(x = 1, y = 2, drawableRes = R.drawable.tile_i),
-                    TileData(x = 2, y = 2, drawableRes = R.drawable.tile_j),
-                    TileData(x = 4, y = 2, drawableRes = R.drawable.tile_k),
-                    TileData(x = 0, y = 3, drawableRes = R.drawable.tile_x),
-                    TileData(x = 1, y = 3, drawableRes = R.drawable.tile_m),
-                    TileData(x = 2, y = 3, drawableRes = R.drawable.tile_n),
-                    TileData(x = 3, y = 3, drawableRes = R.drawable.tile_o),
-                    TileData(x = 0, y = 4, drawableRes = R.drawable.tile_p),
-                    TileData(x = 2, y = 4, drawableRes = R.drawable.tile_q),
-                    TileData(x = 3, y = 4, drawableRes = R.drawable.tile_r),
-                    TileData(x = 4, y = 4, drawableRes = R.drawable.tile_s),
-                    TileData(x = 1, y = 5, drawableRes = R.drawable.tile_t),
-                    TileData(x = 2, y = 5, drawableRes = R.drawable.tile_a),
-                    TileData(x = 4, y = 5, drawableRes = R.drawable.tile_b)
+                    TileData(x = 0, y = 0, drawableRes = R.drawable.tile_a)
                 )
             }
 
@@ -769,8 +786,84 @@ fun GameplayScreen(gameId: String) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            BottomScreenBar()
+            BottomScreenBar(viewModel)
+
         }
+    }
+}
+
+@Composable
+fun PlayerRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Player",
+                    tint = if (index == 0) Color.Green else Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
+                Text(name, fontSize = 12.sp,
+                    color = if (index == 0) Color.Green else Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun TileBackRow(viewModel: GameViewModel, gameId: String) {
+    val counters = remember { List(4) { mutableIntStateOf(18) } }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        repeat(4) { index ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TileBackButton(
+                    remaining = counters[index].intValue,
+                    onClick = {
+                        if (counters[index].intValue > 0) {
+                            counters[index].intValue -= 1
+                            viewModel.requestTileFromBackend(gameId, "HOST")
+                        }
+                    },
+                    isEnabled = counters[index].intValue > 0
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TileBackButton(
+    remaining: Int,
+    onClick: () -> Unit,
+    backgroundRes: Int = R.drawable.tile_back,
+    isEnabled: Boolean
+) {
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clickable(enabled = isEnabled) { onClick() }
+    ) {
+        Image(
+            painter = painterResource(id = backgroundRes),
+            contentDescription = "Tile back image",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Text(
+            text = "$remaining",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (isEnabled) Color.White else Color.Red,
+            modifier = Modifier.align(Alignment.Center)
+        )
     }
 }
 
@@ -852,28 +945,9 @@ fun PannableTileGrid(
 }
 
 @Composable
-fun PlayerRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Player",
-                    tint = if (index == 0) Color.Green else Color.White,
-                    modifier = Modifier.size(30.dp)
-                )
-                Text(name, fontSize = 12.sp,
-                    color = if (index == 0) Color.Green else Color.White)
-            }
-        }
-    }
-}
+fun BottomScreenBar(viewModel: GameViewModel) {
+    val tile = viewModel.currentTile.value
 
-@Composable
-fun BottomScreenBar() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -910,13 +984,15 @@ fun BottomScreenBar() {
                 }
             }
 
-            // Platzhalter für gezogene Karte
+            // Gezogene Karte wird angezeigt
             Box(
                 modifier = Modifier.height(170.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.tile_j),
+                tile?.let {
+                    DrawTile(it, viewModel)
+                } ?: Image(
+                    painter = painterResource(id = R.drawable.tile_back),
                     contentDescription = "Demo Tile",
                     contentScale = ContentScale.FillBounds,
                     modifier = Modifier.size(135.dp)
@@ -964,23 +1040,6 @@ fun BottomScreenBar() {
 }
 
 @Composable
-fun TileBackRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        repeat(4) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                TileBackButton(
-                    label = "18",
-                    onClick = {}
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun BackgroundImage() {
     Image(
         painter = painterResource(id = R.drawable.bg_pxart),
@@ -1020,34 +1079,6 @@ fun PixelArtButton(
     }
 }
 
-@Composable
-fun TileBackButton(
-    label: String,
-    onClick: () -> Unit,
-    backgroundRes: Int = R.drawable.tile_back
-) {
-    Box(
-        modifier = Modifier
-            .size(72.dp)
-            .clickable { onClick() }
-    ) {
-        Image(
-            painter = painterResource(id = backgroundRes),
-            contentDescription = "Tile back image",
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier.matchParentSize()
-        )
-
-        Text(
-            text = label,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-            modifier = Modifier.align(Alignment.Center)
-        )
-    }
-}
-
 //Singleton TokenManager to store JWT
 object TokenManager {
     var userToken: String? = null
@@ -1061,5 +1092,45 @@ fun parseErrorMessage(body: String?): String {
         json.getString("message")
     } catch (_: Exception) {
         "Unexpected error!"
+    }
+}
+
+@SuppressLint("DiscouragedApi")
+@Composable
+fun DrawTile(tile: Tile, viewModel: GameViewModel) {
+    val context = LocalContext.current
+
+    val baseId = tile.id.split("-").take(2).joinToString("-") // e.g. "tile-b-1" → "tile-b"
+    val drawableName = baseId.replace("-", "_") // -> "tile"
+
+    val drawableId = remember(drawableName) {
+        context.resources.getIdentifier(drawableName, "drawable", context.packageName)
+    }
+
+    if (drawableId != 0) {
+        Image(
+            painter = painterResource(id = drawableId),
+            contentDescription = tile.id,
+            modifier = Modifier
+                .size(135.dp)
+                .graphicsLayer(
+                    rotationZ = when (tile.tileRotation) {
+                        TileRotation.NORTH -> 0f
+                        TileRotation.EAST -> 90f
+                        TileRotation.SOUTH -> 180f
+                        TileRotation.WEST -> 270f
+                    }
+                )
+                .clickable(onClick = { viewModel.rotateCurrentTile() })
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(135.dp)
+                .background(Color.Red),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "?", color = Color.White)
+        }
     }
 }

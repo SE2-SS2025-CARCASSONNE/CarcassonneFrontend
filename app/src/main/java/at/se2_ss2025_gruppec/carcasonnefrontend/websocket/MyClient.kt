@@ -19,7 +19,8 @@ import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks) {
 
-    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
+    //private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
+    private val WEBSOCKET_URI = "ws://192.168.8.54:8080/ws/game"
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job
@@ -116,25 +117,24 @@ class MyClient(val callbacks: Callbacks) {
             }
         }
     }
-
     fun listenOn(topic: String, onMessage: (String) -> Unit) {
         scope.launch {
             try {
-                val activeSession = session
-                if (activeSession == null) {
-                    Log.e("WebSocket", "Cannot listen - session not initialized")
-                    return@launch
-                }
+                val activeSession = session ?: return@launch
                 val flow = activeSession.subscribeText(topic)
+
                 flow.collect { msg ->
-                    Log.d("WebSocket", "Received message on $topic: $msg")
-                    onMessage(msg)
+                    Log.d("WebSocket", "✅ Received message on $topic: $msg")
+                    onMessage(msg) // ✅ Forward the full raw message to handler (e.g., handleLobbyMessage)
                 }
+
             } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to listen on $topic: ${e.message}")
+                Log.e("WebSocket", "❌ Failed to listen on $topic: ${e.message}")
             }
         }
     }
+
+
     fun isConnected(): Boolean {
         return session != null
     }
@@ -145,6 +145,8 @@ class MyClient(val callbacks: Callbacks) {
             put("player", playerName)
         }
 
+
+
         scope.launch {
             try {
                 session?.sendText("/app/game/send", json.toString())
@@ -154,4 +156,21 @@ class MyClient(val callbacks: Callbacks) {
             }
         }
     }
+    fun sendDrawTileRequest(gameId: String, playerId: String) {
+        val json = JSONObject().apply {
+            put("type", "DRAW_TILE")
+            put("gameId", gameId)
+            put("player", playerId)
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "Draw tile request sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send draw tile request: ${e.message}")
+            }
+        }
+    }
+
 }
