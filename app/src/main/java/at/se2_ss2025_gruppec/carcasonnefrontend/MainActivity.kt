@@ -716,6 +716,8 @@ fun GameplayScreenPreview() {
 
 @Composable
 fun GameplayScreen(gameId: String) {
+    var isMeeplePlacementActive by remember { mutableStateOf(false)}
+
     Box(modifier = Modifier.fillMaxSize()) {
         print(gameId)
 
@@ -769,7 +771,10 @@ fun GameplayScreen(gameId: String) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            BottomScreenBar()
+            BottomScreenBar(
+                isMeeplePlacementActive = isMeeplePlacementActive,
+                onMeeplePlacementChange = { isMeeplePlacementActive = it }
+            )
         }
     }
 }
@@ -873,7 +878,10 @@ fun PlayerRow() {
 }
 
 @Composable
-fun BottomScreenBar() {
+fun BottomScreenBar(
+    isMeeplePlacementActive: Boolean,
+    onMeeplePlacementChange: (Boolean) -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -897,8 +905,10 @@ fun BottomScreenBar() {
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.meeple_blu),
-                        contentDescription = "Meeple",
-                        modifier = Modifier.size(65.dp)
+                        contentDescription = "Meeple setzen",
+                        modifier = Modifier
+                            .size(if (isMeeplePlacementActive) 75.dp else 65.dp) // Größer, wenn aktiv
+                            .clickable { onMeeplePlacementChange(true) }
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
@@ -933,10 +943,12 @@ fun BottomScreenBar() {
                 ) {
                     // Karten-Rückseite
                     Image(
-                        painter = painterResource(id = R.drawable.tile_back),
-                        contentDescription = "Tile Back",
+                        painter = painterResource(id = R.drawable.meeple_no),
+                        contentDescription = "Meeple nicht setzen",
                         contentScale = ContentScale.FillBounds,
-                        modifier = Modifier.size(65.dp)
+                        modifier = Modifier
+                            .size(65.dp)
+                            .clickable { onMeeplePlacementChange(false) }
                     )
 
                     Spacer(modifier = Modifier.height(13.dp))
