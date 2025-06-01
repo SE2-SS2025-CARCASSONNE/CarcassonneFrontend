@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeepleType
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
@@ -86,6 +88,32 @@ class GameViewModel constructor(
                     }
                 }
 
+                "meeple_placed" -> {
+                    try {
+                        // Extrahiere die Meeple-Informationen aus der Nachricht
+                        val meepleJson = json.getJSONObject("meeple")
+                        val meeple = parseMeepleFromJson(meepleJson)
+
+                        // Extrahiere die Spieler-ID, die das Meeple gesetzt hat
+                        val playerId = json.getString("player")
+
+                        // Extrahiere die Position des Meeples
+                        val position = Position(
+                            x = meepleJson.getInt("x"),
+                            y = meepleJson.getInt("y")
+                        )
+
+                        // Aktualisiere das Spielfeld mit dem gesetzten Meeple
+                        updateBoardWithMeeple(meeple, position, playerId)
+
+                        Log.d("WebSocket", "Meeple gesetzt: ${meeple.id} an Position ($position.x, $position.y)")
+
+                    } catch (e: Exception) {
+                        Log.e("WebSocket", "Fehler beim Verarbeiten von meeple_placed: ${e.message}")
+                        _uiState.value = GameUiState.Error("Fehler beim Setzen des Meeples: ${e.message}")
+                    }
+                }
+
                 else -> {
                     Log.d("WebSocket", "Unhandled message type: $type")
                 }
@@ -136,12 +164,42 @@ class GameViewModel constructor(
         }
     }
 
-
     fun selectTile(tile: Tile) {
         _selectedTile.value = tile
         _currentRotation.value = TileRotation.NORTH
     }
 
+    fun placeMeeple(gameId: String, playerId: String, meepleId: String, tileId: String, position: String) {
+        webSocketClient.sendPlaceMeeple(gameId, playerId, meepleId, tileId, position)
+        Log.d("GameViewModel", "Meeple placement requested: $meepleId by player $playerId")
+    }
+
+    private fun parseMeepleFromJson(json: JSONObject): Meeple {
+        return Meeple(
+            id = json.getString("id"),
+            playerId = json.getString("playerId"),
+            tileId = json.getString("tileId"),
+            position = MeeplePosition.valueOf(json.getString("position")),
+            type = MeepleType.valueOf(json.getString("type"))
+        )
+    }
+
+    private fun updateBoardWithMeeple(meeple: Meeple, position: Position, playerId: String) {
+        val currentState = _uiState.value
+        if (currentState is GameUiState.Success) {
+            val updatedMeeples = currentState.gameState.meeples.toMutableList()
+            updatedMeeples.add(meeple)
+
+            val updatedGameState = currentState.gameState.copy(
+                meeples = updatedMeeples
+            )
+
+            _uiState.value = GameUiState.Success(updatedGameState)
+            Log.d("GameViewModel", "Meeple placed successfully: ${meeple.id} by player $playerId")
+        } else {
+            Log.e("GameViewModel", "Cannot place meeple - Game state is not in Success")
+        }
+    }
 }
 
 /**
