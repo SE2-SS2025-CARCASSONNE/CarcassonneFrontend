@@ -154,4 +154,16 @@ class MyClient(val callbacks: Callbacks) {
             }
         }
     }
+    fun sendEndGame(gameId: String, player: String) {
+        val json = JSONObject().apply {
+            put("type", "end_game")
+            put("gameId", gameId)
+            put("player", player)
+        }
+
+        scope.launch {
+            session?.sendText("/app/game/send", json.toString())
+            Log.d("WebSocket", "End game message sent: $json")
+        }
+    }
 }

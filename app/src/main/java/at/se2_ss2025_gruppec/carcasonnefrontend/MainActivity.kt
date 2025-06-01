@@ -55,8 +55,12 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.AuthViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
-import at.se2_ss2025_gruppec.carcasonnefrontend.SoundManager
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.*
+import androidx.compose.foundation.shape.CircleShape
 import kotlinx.coroutines.delay
+import kotlin.random.Random
+import androidx.compose.foundation.layout.offset
 import org.json.JSONObject
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
@@ -716,23 +720,56 @@ fun GameplayScreenPreview() {
 
 @Composable
 fun GameplayScreen(gameId: String) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        print(gameId)
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        SoundManager.stopMusic()
+        SoundManager.playMusic(context, R.raw.gameplay_music)
+    }
 
+    val showEndGameDialog = remember { mutableStateOf(false) }
+    val winner = remember { mutableStateOf("") }
+    val scores = remember { mutableStateListOf<Pair<String, Int>>() }
+
+    LaunchedEffect(gameId) {
+        val stompClient = MyClient(object : Callbacks {
+            override fun onResponse(msg: String) {
+                if (!msg.trim().startsWith("{")) return
+                val json = JSONObject(msg)
+                if (json.getString("type") == "game_over") {
+                    val winnerName = json.getString("winner")
+                    val scoreArray = json.getJSONArray("scores")
+                    val parsedScores = mutableListOf<Pair<String, Int>>()
+
+                    for (i in 0 until scoreArray.length()) {
+                        val entry = scoreArray.getJSONObject(i)
+                        parsedScores.add(entry.getString("player") to entry.getInt("score"))
+                    }
+
+                    winner.value = winnerName
+                    scores.clear()
+                    scores.addAll(parsedScores)
+                    showEndGameDialog.value = true
+                }
+            }
+        })
+
+        stompClient.connect()
+        while (!stompClient.isConnected()) delay(100)
+        stompClient.listenOn("/topic/game/$gameId") { msg -> stompClient.callbacks.onResponse(msg) }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
 
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(40.dp))
 
             PlayerRow()
-
             Spacer(modifier = Modifier.height(20.dp))
-
             TileBackRow()
-
             Spacer(modifier = Modifier.height(20.dp))
 
-            val tiles = remember { // Just for showcasing UI, delete later
+            val tiles = remember {
                 listOf(
                     TileData(x = 0, y = 0, drawableRes = R.drawable.tile_a),
                     TileData(x = 1, y = 0, drawableRes = R.drawable.tile_b),
@@ -764,12 +801,80 @@ fun GameplayScreen(gameId: String) {
                 onTileClick = { x, y ->
                     println("Tapped tile at ($x, $y)")
                 },
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(20.dp))
-
             BottomScreenBar()
+        }
+
+        var triggerEndGame by remember { mutableStateOf(false) }
+
+        Button(
+            onClick = { triggerEndGame = true },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(32.dp)
+                .width(200.dp)
+                .height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC000000))
+        ) {
+            Text("Force End Game")
+        }
+
+        if (triggerEndGame) {
+            LaunchedEffect(triggerEndGame) {
+                val stomp = MyClient(object : Callbacks {
+                    override fun onResponse(msg: String) {}
+                })
+
+                stomp.connect()
+                delay(700)
+                stomp.sendEndGame(gameId, TokenManager.loggedInUsername ?: "")
+                triggerEndGame = false
+            }
+        }
+
+        if (showEndGameDialog.value) {
+            ConfettiAnimation(visible = true)
+
+            LaunchedEffect(showEndGameDialog.value) {
+                SoundManager.playMusic(context, R.raw.endgame_music1)
+            }
+
+            AlertDialog(
+                onDismissRequest = {},
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showEndGameDialog.value = false
+                            SoundManager.playMusic(context, R.raw.lobby_music)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF5A3A1A),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Close")
+                    }
+                },
+                title = { Text("Game Over", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column {
+                        Text("\ud83c\udfc6 Winner: ${winner.value}", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        scores.sortedByDescending { it.second }.forEach { (name, score) ->
+                            Text("$name: $score points")
+                        }
+                    }
+                },
+                containerColor = Color(0xFF4E342E),
+                titleContentColor = Color.White,
+                textContentColor = Color.White
+            )
         }
     }
 }
@@ -979,7 +1084,81 @@ fun TileBackRow() {
         }
     }
 }
+@Composable
+fun ConfettiAnimation(
+    visible: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (!visible) return
 
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+
+    val confettiList = remember { mutableStateListOf<ConfettiParticle>() }
+
+    // Launch a coroutine that adds new particles repeatedly
+    LaunchedEffect(visible) {
+        while (visible) {
+            repeat(8) {
+                confettiList.add(
+                    ConfettiParticle(
+                        x = Random.nextInt(0, screenWidth.value.toInt()).dp,
+                        color = Color(
+                            red = Random.nextFloat(),
+                            green = Random.nextFloat(),
+                            blue = Random.nextFloat()
+                        )
+                    )
+                )
+            }
+            delay(200) // emit new particles every 200ms
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        confettiList.forEach { particle ->
+            ConfettiFallingItem(
+                x = particle.x,
+                color = particle.color,
+                screenHeight = screenHeight,
+                onFinished = { confettiList.remove(particle) }
+            )
+        }
+    }
+}
+
+@Composable
+fun ConfettiFallingItem(
+    x: Dp,
+    color: Color,
+    screenHeight: Dp,
+    onFinished: () -> Unit
+) {
+    val yOffset = remember { Animatable(-10f) }
+
+    LaunchedEffect(Unit) {
+        yOffset.animateTo(
+            targetValue = screenHeight.value + 20f,
+            animationSpec = tween(
+                durationMillis = 2500 + Random.nextInt(0, 1000),
+                easing = LinearEasing
+            )
+        )
+        onFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .offset(x = x, y = yOffset.value.dp)
+            .size(8.dp)
+            .background(color = color, shape = CircleShape)
+    )
+}
+
+data class ConfettiParticle(
+    val x: Dp,
+    val color: Color
+)
 @Composable
 fun BackgroundImage() {
     Image(

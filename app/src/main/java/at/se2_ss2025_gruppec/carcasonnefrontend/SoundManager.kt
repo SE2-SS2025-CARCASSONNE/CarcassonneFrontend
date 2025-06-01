@@ -2,9 +2,6 @@ package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.content.Context
 import android.media.MediaPlayer
-import android.util.Log
-import at.se2_ss2025_gruppec.carcasonnefrontend.R
-import at.se2_ss2025_gruppec.carcasonnefrontend.SoundManager.mediaPlayer
 
 object SoundManager {
     private var mediaPlayer: MediaPlayer? = null
