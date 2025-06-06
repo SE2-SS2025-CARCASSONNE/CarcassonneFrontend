@@ -12,6 +12,7 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
@@ -48,6 +49,9 @@ class GameViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState
+
+    private val _players = mutableStateListOf<Player>()
+    val players: List<Player> get() = _players
 
     private val _selectedTile = MutableStateFlow<Tile?>(null)
     val selectedTile: StateFlow<Tile?> = _selectedTile
@@ -97,6 +101,9 @@ class GameViewModel : ViewModel() {
                     val tile = parseTileFromJson(tileJson)
                     onTileDrawn(tile)
                 }
+                "SCORE_UPDATED" -> {
+                    handleScoreUpdateMessage(json)
+                }
                 "board_update" -> {
                     try {
                         // Extract tile information from the payload
@@ -127,6 +134,7 @@ class GameViewModel : ViewModel() {
                     }
                 }
 
+
                 "error" -> {
                     val message = json.getString("message")
                     Log.e("WebSocket", "Error from server: $message")
@@ -144,6 +152,15 @@ class GameViewModel : ViewModel() {
             Log.e("WebSocket", "Failed to parse WebSocket message: ${e.message}")
         }
     }
+    fun requestScoreUpdate(gameId: String) {
+        if (webSocketClient.isConnected()) {
+            webSocketClient.sendCalculateScoreRequest(gameId)
+            Log.d("WebSocket", "Score update requested.")
+        } else {
+            Log.e("WebSocket", "WebSocket not connected!")
+        }
+    }
+
 
     fun onTileDrawn(tile: Tile) {
         _currentTile.value = tile
@@ -287,6 +304,27 @@ class GameViewModel : ViewModel() {
     fun selectTile(tile: Tile) {
         _selectedTile.value = tile
         _currentRotation.value = TileRotation.NORTH
+    }
+
+    private fun handleScoreUpdateMessage(json: JSONObject) {
+        val scoreArray = json.getJSONArray("scores")
+        val updatedPlayers = mutableListOf<Player>()
+        for (i in 0 until scoreArray.length()) {
+            val obj = scoreArray.getJSONObject(i)
+            val player = Player(
+                id = obj.getString("id"),
+                name = "", //Dummy Werte bis zu Refactorn
+                color = Color.Black,   //TODO Refactoren
+                score = obj.getInt("score"),
+                availableMeeples = obj.optInt("remainingMeeple", 0),
+               // userId = if (obj.has("user_id")) obj.getInt("user_id") else null
+            )
+            updatedPlayers.add(player)
+        }
+
+        _players.clear()
+        _players.addAll(updatedPlayers)
+        Log.d("WebSocket", "Updated player scores: $_players")
     }
 
 }
