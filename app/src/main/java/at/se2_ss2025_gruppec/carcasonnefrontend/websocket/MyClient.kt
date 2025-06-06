@@ -172,4 +172,20 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+    fun sendCalculateScoreRequest(gameId: String) {
+        val json = JSONObject().apply {
+            put("type", "calculate_score")
+            put("gameId", gameId)
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "Calculate score request sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send calculate score request: ${e.message}")
+            }
+        }
+    }
+
 }
