@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
@@ -779,7 +780,7 @@ fun GameplayScreen(gameId: String) {
             PannableTileGrid(
                 tiles = tiles,
                 onTileClick = { x, y ->
-                    println("Tapped tile at ($x, $y)")
+                    viewModel.placeTileAt(Position(x, y))
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )

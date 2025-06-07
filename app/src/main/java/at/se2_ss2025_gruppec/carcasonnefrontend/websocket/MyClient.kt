@@ -172,4 +172,8 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+    fun sendPlaceTileRequest(payload: String){
+        // TODO: send request to backend
+    }
+
 }
