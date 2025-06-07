@@ -65,9 +65,8 @@ class GameViewModel : ViewModel() {
 
     fun setMeeplePlacement(active: Boolean) {
         _isMeeplePlacementActive.value = active
+        Log.d("MeeplePlacement", "Meeple Placement Active: ${_isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
     }
-
-
 
     private lateinit var webSocketClient: MyClient
 
@@ -180,6 +179,10 @@ class GameViewModel : ViewModel() {
         } catch (e: Exception) {
             Log.e("WebSocket", "Failed to parse WebSocket message: ${e.message}")
         }
+    }
+
+    fun requestScoreUpdate(gameId: String) {  // TODO: Felix bzw. Reviewer: Bei Merge durch Felix-Methode ersetzen!
+        Log.d("GameViewModel", "Dummy: Score update requested for gameId: $gameId")
     }
 
     fun onTileDrawn(tile: Tile) {

@@ -788,7 +788,7 @@ fun GameplayScreen(gameId: String) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            BottomScreenBar(viewModel)
+            BottomScreenBar(viewModel, gameId)
 
         }
     }
@@ -947,9 +947,10 @@ fun PannableTileGrid(
 }
 
 @Composable
-fun BottomScreenBar(viewModel: GameViewModel) {
+fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
     val tile = viewModel.currentTile.value //TODO: Mike oder doch collectAsState?
-    val isMeeplePlacementActive = remember { mutableStateOf(false) }
+    val isMeeplePlacementActive = viewModel.isMeeplePlacementActive.collectAsState()
+    Log.d("MeeplePlacement", "UI State: ${isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
 
     Box(
         modifier = Modifier
@@ -977,7 +978,7 @@ fun BottomScreenBar(viewModel: GameViewModel) {
                         contentDescription = "Meeple setzen",
                         modifier = Modifier
                             .size(if (isMeeplePlacementActive.value) 75.dp else 65.dp) // Größer, wenn aktiv
-                            .clickable {viewModel.setMeeplePlacement(true) }
+                            .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive.value) }
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
@@ -1004,7 +1005,7 @@ fun BottomScreenBar(viewModel: GameViewModel) {
                 )
             }
 
-            // Rechte Seite: Karte + Punkt-Badge
+            // Rechte Seite: No-Meeple-Symbol + Punkt-Badge
             Box(
                 modifier = Modifier.size(110.dp),
                 contentAlignment = Alignment.Center
@@ -1012,14 +1013,17 @@ fun BottomScreenBar(viewModel: GameViewModel) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Karten-Rückseite
+                    // No-Meeple-Symbol
                     Image(
                         painter = painterResource(id = R.drawable.meeple_no),
                         contentDescription = "Meeple nicht setzen",
                         contentScale = ContentScale.FillBounds,
                         modifier = Modifier
                             .size(65.dp)
-                            .clickable { viewModel.setMeeplePlacement(false) }
+                            .clickable {
+                                viewModel.setMeeplePlacement(false)
+                                viewModel.requestScoreUpdate(gameId) // Punkteberechnung starten
+                            }
                     )
 
                     Spacer(modifier = Modifier.height(13.dp))
