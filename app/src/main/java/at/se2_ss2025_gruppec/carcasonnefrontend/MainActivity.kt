@@ -65,6 +65,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeepleType
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
@@ -778,10 +781,18 @@ fun GameplayScreen(gameId: String) {
                 )
             }
 
+            val meeples = remember { // Just for showcasing UI, delete later
+                listOf(
+                    Meeple("123", "kdo3", MeepleType.MONK)
+                )
+            }
+
             PannableTileGrid(
                 tiles = tiles,
-                onTileClick = { x, y ->
-                    println("Tapped tile at ($x, $y)")
+                meeples = meeples,
+                onTileClick = { x, y -> },
+                onMeepleClick = { x, y, zone ->
+                    viewModel.placeMeeple("1", "2", "3", "4", "5") // Replace with proper placeMeeple call
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
@@ -878,7 +889,9 @@ data class TileData(
 @Composable
 fun PannableTileGrid(
     tiles: List<TileData>,
+    meeples: List<Meeple>,
     onTileClick: (Int, Int) -> Unit,
+    onMeepleClick: (Int, Int, MeeplePosition) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val tileSize = 100.dp
@@ -904,6 +917,26 @@ fun PannableTileGrid(
                 val x = ((offset.x - offsetX.floatValue) / tileSizePxScaled).toInt()
                 val y = ((offset.y - offsetY.floatValue) / tileSizePxScaled).toInt()
                 onTileClick(x, y)
+
+                val tileStartX = x * tileSizePxScaled + offsetX.floatValue
+                val tileStartY = y * tileSizePxScaled + offsetY.floatValue
+                val localX = offset.x - tileStartX
+                val localY = offset.y - tileStartY
+
+                val segment = tileSizePxScaled / 3f
+                val zone = when {
+                    localX < segment && localY in segment..(2 * segment) -> MeeplePosition.WEST
+                    localX > 2 * segment && localY in segment..(2 * segment) -> MeeplePosition.EAST
+                    localY < segment && localX in segment..(2 * segment) -> MeeplePosition.NORTH
+                    localY > 2 * segment && localX in segment..(2 * segment) -> MeeplePosition.SOUTH
+                    localX in segment..(2 * segment) && localY in segment..(2 * segment) -> MeeplePosition.CENTER
+                    else -> null
+                }
+
+                zone?.let {
+                    println("Tapped tile ($x, $y) at zone: $it")
+                    onMeepleClick(x, y, it)
+                }
             }
         }
 
