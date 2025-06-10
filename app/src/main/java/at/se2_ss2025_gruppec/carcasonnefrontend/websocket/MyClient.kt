@@ -22,6 +22,7 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.MeepleDto
 class MyClient(val callbacks: Callbacks) {
 
     private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
+    //private val WEBSOCKET_URI = "ws://192.168.8.54:8080/ws/game"
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job
@@ -179,10 +180,11 @@ class MyClient(val callbacks: Callbacks) {
         val json = JSONObject().apply {
             put("type", "place_meeple")
             put("gameId", gameId)
+            put("player", playerId)
             put("meeple", JSONObject().apply {
                 put("id", meepleId)
                 put("playerId", playerId)
-                put("type", "STANDARD") // Falls der Meeple-Typ benötigt wird
+                put("type", "MONK") // TODO MIKE: Falls der Meeple-Typ benötigt wird, derzeit fix auf Monk gesetzt!
                 put("tileId", tileId)
                 put("position", position)
             })

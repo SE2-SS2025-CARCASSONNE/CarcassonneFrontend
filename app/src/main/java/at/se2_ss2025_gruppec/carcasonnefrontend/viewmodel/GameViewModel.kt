@@ -63,10 +63,25 @@ class GameViewModel : ViewModel() {
     private val _isMeeplePlacementActive = MutableStateFlow(false)
     val isMeeplePlacementActive: StateFlow<Boolean> get() = _isMeeplePlacementActive
 
+    private val _remainingMeeples = MutableStateFlow(mapOf<String, Int>())
+    val remainingMeeples: StateFlow<Map<String, Int>> get() = _remainingMeeples
+
+
     fun setMeeplePlacement(active: Boolean) {
         _isMeeplePlacementActive.value = active
         Log.d("MeeplePlacement", "Meeple Placement Active: ${_isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
     }
+
+    fun updateRemainingMeeples(playerId: String, meepleCount: Int) {
+        _remainingMeeples.value = _remainingMeeples.value.toMutableMap().apply {
+            this[playerId] = meepleCount
+        }
+    }
+
+    /*fun initializeTile() { //TODO Michael: nur Zwischenlösung bis TilePlacement da ist.
+        _currentTile.value = Tile("tile-a", "FIELD", "FIELD", "ROAD", "FIELD", hasMonastery = true)
+        Log.d("GameViewModel", "currentTile gesetzt: ${_currentTile.value}")
+    } */
 
     private lateinit var webSocketClient: MyClient
 
@@ -151,6 +166,7 @@ class GameViewModel : ViewModel() {
                         // Extrahiere die Meeple-Informationen aus der Nachricht
                         val meepleJson = json.getJSONObject("meeple")
                         val meeple = parseMeepleFromJson(meepleJson)
+                        val remainingMeeple = json.getInt("remainingMeeple")
 
                         // Extrahiere die Spieler-ID, die das Meeple gesetzt hat
                         val playerId = json.getString("player")
@@ -164,7 +180,12 @@ class GameViewModel : ViewModel() {
                         // Aktualisiere das Spielfeld mit dem gesetzten Meeple
                         updateBoardWithMeeple(meeple, position, playerId)
 
-                        Log.d("WebSocket", "Meeple gesetzt: ${meeple.id} an Position ($position.x, $position.y)")
+                        // Meeple-Anzahl aktualisieren
+                        updateRemainingMeeples(playerId, remainingMeeple)
+
+                        // Log.d("WebSocket", "Meeple gesetzt: ${meeple.id} an Position ($position.x, $position.y)")
+                        Log.d("GameViewModel", "Meeple gesetzt: ${meeple.id}, verbleibende Meeples für $playerId: $remainingMeeple")
+
 
                     } catch (e: Exception) {
                         Log.e("WebSocket", "Fehler beim Verarbeiten von meeple_placed: ${e.message}")

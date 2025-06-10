@@ -45,11 +45,11 @@ enum class MeepleType {
 }
 
 enum class MeeplePosition {
-    NORTH,
-    EAST,
-    SOUTH,
-    WEST,
-    CENTER
+    N, // North
+    E, // East
+    S, // South
+    W, // West
+    C  // Center (Monastery)
 }
 
 data class Meeple(

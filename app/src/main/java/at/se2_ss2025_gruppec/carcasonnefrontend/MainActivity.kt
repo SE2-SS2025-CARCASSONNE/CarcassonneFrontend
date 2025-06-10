@@ -756,6 +756,11 @@ fun GameplayScreen(gameId: String) {
     val viewModel: GameViewModel = viewModel()
     val currentTile by viewModel.currentTile
 
+    /* // Setzt das aktuelle Tile direkt nach dem Laden des Screens TODO Mike: Zwischenlösung bis Tile-Placement da ist.
+    LaunchedEffect(Unit) {
+        viewModel.initializeTile() // Stellt sicher, dass currentTile gesetzt ist
+    }
+    */
     LaunchedEffect(Unit) {
         viewModel.subscribeToGame(gameId)
     }
@@ -792,7 +797,19 @@ fun GameplayScreen(gameId: String) {
                 meeples = meeples,
                 onTileClick = { x, y -> },
                 onMeepleClick = { x, y, zone ->
-                    viewModel.placeMeeple("1", "2", "3", "4", "5") // Replace with proper placeMeeple call
+                    Log.d("GameplayScreen", "MeepleClick ausgelöst: x=$x, y=$y, zone=$zone") // Debug-Log für zone!
+
+                    currentTile?.let { tile ->
+                        val playerId = TokenManager.loggedInUsername ?: "unknown"
+                        val meepleId = "test_meeple_123" //TODO Michael: durch echte MeepleId ersetzen
+
+                        if (zone != null) { // Stelle sicher, dass zone nicht null ist
+                            Log.d("GameplayScreen", "Meeple wird platziert mit gameId=$gameId, playerId=$playerId, tileId=${tile.id}, position=${zone.name}") // Debug-Log für placeMeeple
+                            viewModel.placeMeeple(gameId, playerId, meepleId, tile.id, zone.name)
+                        } else {
+                            Log.e("GameplayScreen", "Ungültige Meeple-Zone erkannt – keine Platzierung!")
+                        }
+                    } ?: Log.e("GameplayScreen", "Kein aktueller Tile vorhanden!")
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
@@ -925,11 +942,11 @@ fun PannableTileGrid(
 
                 val segment = tileSizePxScaled / 3f
                 val zone = when {
-                    localX < segment && localY in segment..(2 * segment) -> MeeplePosition.WEST
-                    localX > 2 * segment && localY in segment..(2 * segment) -> MeeplePosition.EAST
-                    localY < segment && localX in segment..(2 * segment) -> MeeplePosition.NORTH
-                    localY > 2 * segment && localX in segment..(2 * segment) -> MeeplePosition.SOUTH
-                    localX in segment..(2 * segment) && localY in segment..(2 * segment) -> MeeplePosition.CENTER
+                    localX < segment && localY in segment..(2 * segment) -> MeeplePosition.W
+                    localX > 2 * segment && localY in segment..(2 * segment) -> MeeplePosition.E
+                    localY < segment && localX in segment..(2 * segment) -> MeeplePosition.N
+                    localY > 2 * segment && localX in segment..(2 * segment) -> MeeplePosition.S
+                    localX in segment..(2 * segment) && localY in segment..(2 * segment) -> MeeplePosition.C
                     else -> null
                 }
 
@@ -982,48 +999,44 @@ fun PannableTileGrid(
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
     val tile = viewModel.currentTile.value //TODO: Mike oder doch collectAsState?
+    val remainingMeeples by viewModel.remainingMeeples.collectAsState()
     val isMeeplePlacementActive = viewModel.isMeeplePlacementActive.collectAsState()
     Log.d("MeeplePlacement", "UI State: ${isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp) // Höhe so bemessen, dass Badge und Karte Platz haben
+            .height(160.dp) // Höhe der BottomScreenBar bleibt erhalten
     ) {
-        // Meeple-Icon links, Spacer, Karte+Badge rechts
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceEvenly // Gleichmäßige Verteilung der Elemente
         ) {
-            // Linke Seite: Meeple + Count unterhalb
+            // Linke Seite: Meeple mit Zahl darüber
             Box(
                 modifier = Modifier.size(100.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.meeple_blu),
-                        contentDescription = "Meeple setzen",
-                        modifier = Modifier
-                            .size(if (isMeeplePlacementActive.value) 75.dp else 65.dp) // Größer, wenn aktiv
-                            .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive.value) }
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "8x",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.meeple_blu),
+                    contentDescription = "Meeple setzen",
+                    modifier = Modifier
+                        .size(if (isMeeplePlacementActive.value) 85.dp else 65.dp)
+                        .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive.value) }
+                )
+
+                Text(
+                    text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 7}",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
 
-            // Gezogene Karte wird angezeigt
+            // Mitte: Das Tile-Bild bleibt exakt zentriert
             Box(
                 modifier = Modifier.height(170.dp),
                 contentAlignment = Alignment.TopCenter
@@ -1038,7 +1051,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 )
             }
 
-            // Rechte Seite: No-Meeple-Symbol + Punkt-Badge
+            // Rechte Seite: No-Meeple-Symbol + Punkt-Badge (opt. mit Spacer für Balance)
             Box(
                 modifier = Modifier.size(110.dp),
                 contentAlignment = Alignment.Center
@@ -1046,7 +1059,6 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // No-Meeple-Symbol
                     Image(
                         painter = painterResource(id = R.drawable.meeple_no),
                         contentDescription = "Meeple nicht setzen",
@@ -1061,7 +1073,6 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
 
                     Spacer(modifier = Modifier.height(13.dp))
 
-                    // Punkte-Badge unten an der Karte
                     Box(
                         modifier = Modifier
                             .background(
