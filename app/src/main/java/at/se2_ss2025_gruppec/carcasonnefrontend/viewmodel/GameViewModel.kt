@@ -283,6 +283,34 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    fun placeTileAt(position: Position) {
+        val tile = _currentTile.value ?: return
+        val rotation = _currentRotation.value
+        val playerId = (_uiState.value as? GameUiState.Success)?.gameState?.players
+            ?.getOrNull((_uiState.value as GameUiState.Success).gameState.currentPlayerIndex)
+            ?.id ?: return
+
+        val payload = JSONObject().apply {
+            put("type", "place_tile")
+            put("playerId", playerId)
+            put("tile", JSONObject().apply {
+                put("id", tile.id)
+                put("terrainNorth", tile.top)
+                put("terrainEast", tile.right)
+                put("terrainSouth", tile.bottom)
+                put("terrainWest", tile.left)
+                put("tileRotation", rotation.name)
+                put("hasMonastery", tile.hasMonastery)
+                put("hasShield", tile.hasShield)
+                put("x", position.x)
+                put("y", position.y)
+            })
+        }
+
+        if (webSocketClient.isConnected())
+            webSocketClient.sendPlaceTileRequest(payload.toString())
+    }
+
 
     fun selectTile(tile: Tile) {
         _selectedTile.value = tile

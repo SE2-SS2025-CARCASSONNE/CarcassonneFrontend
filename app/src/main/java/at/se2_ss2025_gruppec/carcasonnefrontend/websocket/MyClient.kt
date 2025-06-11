@@ -172,4 +172,16 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+    fun sendPlaceTileRequest(payload: String){
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", payload)
+                Log.d("WebSocket", "Tile placement request sent: $payload")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send tile placement request: ${e.message}")
+
+            }
+        }
+    }
+
 }
