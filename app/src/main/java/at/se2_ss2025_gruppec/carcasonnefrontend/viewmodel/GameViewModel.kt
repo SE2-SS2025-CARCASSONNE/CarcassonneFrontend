@@ -1,9 +1,6 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel
 
-
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
@@ -42,6 +39,9 @@ class GameViewModel : ViewModel() {
 
     private val _tileDeck = mutableStateListOf<Tile>()
     val tileDeck: List<Tile> = _tileDeck
+
+    private val _placedTiles = mutableStateListOf<Tile>()
+    val placedTiles: List<Tile> = _placedTiles
 
     private val _currentTile = mutableStateOf<Tile?>(null)
     val currentTile: State<Tile?> get() = _currentTile
@@ -273,6 +273,10 @@ class GameViewModel : ViewModel() {
             // Emit updated UI state
             _uiState.value = GameUiState.Success(updatedGameState)
 
+            // Sync placed tiles with updated board
+            _placedTiles.clear()
+            _placedTiles.addAll(updatedBoard.values)
+
             // Clear selections
             _selectedTile.value = null
             _currentTile.value = null
@@ -310,7 +314,6 @@ class GameViewModel : ViewModel() {
         if (webSocketClient.isConnected())
             webSocketClient.sendPlaceTileRequest(payload.toString())
     }
-
 
     fun selectTile(tile: Tile) {
         _selectedTile.value = tile

@@ -750,7 +750,6 @@ fun GameplayScreenPreview() {
 @Composable
 fun GameplayScreen(gameId: String) {
     val viewModel: GameViewModel = viewModel()
-    val currentTile by viewModel.currentTile
 
     LaunchedEffect(Unit) {
         viewModel.subscribeToGame(gameId)
@@ -771,14 +770,10 @@ fun GameplayScreen(gameId: String) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            val tiles = remember { // Just for showcasing UI, delete later
-                listOf(
-                    TileData(x = 0, y = 0, drawableRes = R.drawable.tile_a)
-                )
-            }
+            val placedTiles = viewModel.placedTiles
 
             PannableTileGrid(
-                tiles = tiles,
+                tiles = placedTiles,
                 onTileClick = { x, y ->
                     viewModel.placeTileAt(Position(x, y))
                 },
@@ -868,15 +863,9 @@ fun TileBackButton(
     }
 }
 
-data class TileData(
-    val x: Int,
-    val y: Int,
-    val drawableRes: Int? = null
-)
-
 @Composable
 fun PannableTileGrid(
-    tiles: List<TileData>,
+    tiles: List<Tile>,
     onTileClick: (Int, Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -915,8 +904,9 @@ fun PannableTileGrid(
             val scaledTileSizePx = tileSizePx * scale.floatValue
 
             tiles.forEach { tile ->
-                val x = tile.x
-                val y = tile.y
+                val position = tile.position ?: return@forEach
+                val x = position.x
+                val y = position.y
                 val left = x * scaledTileSizePx + offsetX.floatValue
                 val top = y * scaledTileSizePx + offsetY.floatValue
 
