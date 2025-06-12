@@ -97,7 +97,9 @@ class GameViewModel : ViewModel() {
                     val tile = parseTileFromJson(tileJson)
                     onTileDrawn(tile)
                 }
+
                 "board_update" -> {
+                    Log.d("WebSocket", "Received board update: $msg")
                     try {
                         // Extract tile information from the payload
                         val tileJson = json.getJSONObject("tile")
@@ -256,6 +258,7 @@ class GameViewModel : ViewModel() {
     }
 
     private fun updateBoardWithTile(tile: Tile, playerId: String?) {
+        Log.d("updateBoard", "Placing tile ${tile.id} at ${tile.position}")
         val currentState = _uiState.value
         if (currentState is GameUiState.Success) {
             val position = tile.position ?: return
@@ -287,16 +290,22 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    fun placeTileAt(position: Position) {
+    fun placeTileAt(position: Position, gameId: String) {
+        Log.d("ViewModel", "placeTileAt called with $position")
         val tile = _currentTile.value ?: return
         val rotation = _currentRotation.value
-        val playerId = (_uiState.value as? GameUiState.Success)?.gameState?.players
+
+        /*val playerId = (_uiState.value as? GameUiState.Success)?.gameState?.players
             ?.getOrNull((_uiState.value as GameUiState.Success).gameState.currentPlayerIndex)
-            ?.id ?: return
+            ?.id ?: return*/
+        val playerId = "dummy-id" // Dummy playerId, since commented-out playerId above causes function to return (problem with missing GameState)
+
+        Log.d("placeTileAt", "Placing tile at $position for playerId = $playerId")
 
         val payload = JSONObject().apply {
             put("type", "place_tile")
-            put("playerId", playerId)
+            put("gameId", gameId)
+            put("player", playerId)
             put("tile", JSONObject().apply {
                 put("id", tile.id)
                 put("terrainNorth", tile.top)
@@ -327,7 +336,6 @@ class GameViewModel : ViewModel() {
  */
 sealed class GameUiState {
     object Loading : GameUiState()
-    object Idle : GameUiState()
     data class Success(val gameState: GameState) : GameUiState()
     data class Error(val message: String) : GameUiState()
 }

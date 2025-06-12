@@ -588,7 +588,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
-                Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName") // ⬅️ Add this
+                Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName")
 
                 Handler(Looper.getMainLooper()).post {
                     players.clear()
@@ -775,7 +775,7 @@ fun GameplayScreen(gameId: String) {
             PannableTileGrid(
                 tiles = placedTiles,
                 onTileClick = { x, y ->
-                    viewModel.placeTileAt(Position(x, y))
+                    viewModel.placeTileAt(Position(x, y), gameId)
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
