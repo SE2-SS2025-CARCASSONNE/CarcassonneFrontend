@@ -36,6 +36,18 @@ fun directionToColor(type: String): Color = when (type) {
 }
 
 class GameViewModel : ViewModel() {
+    private val _validPositions = mutableStateOf<List<Position>>(emptyList())
+    val validPositions: State<List<Position>> = _validPositions
+    fun setValidPositions(positions: List<Position>) {
+        _validPositions.value = positions
+    }
+
+
+    private var joinedPlayerName: String? = null
+
+    fun setJoinedPlayer(name: String) {
+        joinedPlayerName = name
+    }
 
     private val _tileDeck = mutableStateListOf<Tile>()
     val tileDeck: List<Tile> = _tileDeck
@@ -60,6 +72,15 @@ class GameViewModel : ViewModel() {
 
     private lateinit var webSocketClient: MyClient
 
+    fun setWebSocketClient(client: MyClient) {
+        webSocketClient = client
+    }
+
+    fun joinGame(gameId: String, playerName: String) {
+        webSocketClient.sendJoinGame(gameId, playerName)
+    }
+
+
     init {
         viewModelScope.launch {
             webSocketClient = MyClient(object : Callbacks {
@@ -83,7 +104,7 @@ class GameViewModel : ViewModel() {
             webSocketClient.sendDrawTileRequest(gameId, playerId)
         } else {
             Log.e("WebSocket", "Not connected yet, can't draw tile.")
-        }        
+        }
     }
 
     private fun handleWebSocketMessage(msg: String) {
@@ -92,10 +113,26 @@ class GameViewModel : ViewModel() {
             val type = json.getString("type")
 
             when (type) {
+                "player_joined" -> {
+                    val currentPlayer = json.getString("currentPlayer")
+                    setJoinedPlayer(currentPlayer)
+                }
+
                 "TILE_DRAWN" -> {
                     val tileJson = json.getJSONObject("tile")
                     val tile = parseTileFromJson(tileJson)
                     onTileDrawn(tile)
+                    val validPositionsList = mutableListOf<Position>()
+                    if (json.has("validPositions")) {
+                        val validPositionsJson = json.getJSONArray("validPositions")
+                        for (i in 0 until validPositionsJson.length()) {
+                            val posObj = validPositionsJson.getJSONObject(i)
+                            val x = posObj.getInt("x")
+                            val y = posObj.getInt("y")
+                            validPositionsList.add(Position(x, y))
+                        }
+                        setValidPositions(validPositionsList) // <--- Implement this in your ViewModel
+                    }
                 }
 
                 "board_update" -> {
@@ -121,7 +158,10 @@ class GameViewModel : ViewModel() {
                         // Update the board state
                         updateBoardWithTile(tileWithPosition, playerId)
 
-                        Log.d("WebSocket", "Board updated with tile: ${placedTile.id} at position ($position.x, $position.y)")
+                        Log.d(
+                            "WebSocket",
+                            "Board updated with tile: ${placedTile.id} at position ($position.x, $position.y)"
+                        )
 
                     } catch (e: Exception) {
                         Log.e("WebSocket", "Failed to process board_update: ${e.message}")
@@ -252,6 +292,7 @@ class GameViewModel : ViewModel() {
     fun rotateCurrentTile() {
         _currentTile.value = _currentTile.value?.rotateClockwise()
     }
+
     fun clearCurrentTile() {
         _currentTile.value = null
         Log.d("WebSocket", "Current tile cleared due to no playable tiles")
@@ -295,10 +336,19 @@ class GameViewModel : ViewModel() {
         val tile = _currentTile.value ?: return
         val rotation = _currentRotation.value
 
+
+        if (joinedPlayerName == null) {
+            Log.e("placeTileAt", " Cannot place tile - player name is null")
+            return
+        }
+
+        val playerId = joinedPlayerName ?: return
+
+
         /*val playerId = (_uiState.value as? GameUiState.Success)?.gameState?.players
             ?.getOrNull((_uiState.value as GameUiState.Success).gameState.currentPlayerIndex)
             ?.id ?: return*/
-        val playerId = "dummy-id" // Dummy playerId, since commented-out playerId above causes function to return (problem with missing GameState)
+        //val playerId = "dummy-id" // Dummy playerId, since commented-out playerId above causes function to return (problem with missing GameState)
 
         Log.d("placeTileAt", "Placing tile at $position for playerId = $playerId")
 
@@ -315,23 +365,59 @@ class GameViewModel : ViewModel() {
                 put("tileRotation", rotation.name)
                 put("hasMonastery", tile.hasMonastery)
                 put("hasShield", tile.hasShield)
-                put("x", position.x)
-                put("y", position.y)
+                put("position", JSONObject().apply {
+                    put("x", position.x)
+                    put("y", position.y)
+
+                })
             })
         }
 
-        if (webSocketClient.isConnected())
+        /* if (webSocketClient.isConnected())
+            webSocketClient.sendPlaceTileRequest(payload.toString())*/
+        if (webSocketClient.isConnected()) {
             webSocketClient.sendPlaceTileRequest(payload.toString())
+            Log.d("WebSocket", "Tile placement request sent: $payload")
+        } else {
+            Log.e("WebSocket", "Cannot send tile - WebSocket not connected")
+        }
+
+
     }
+
 
     fun selectTile(tile: Tile) {
         _selectedTile.value = tile
         _currentRotation.value = TileRotation.NORTH
     }
 
+    /*
+    fun isValidPlacement(position: Position): Boolean {
+        // Disallow placing on already occupied position
+        if (_placedTiles.any { it.position == position }) return false
+
+        // Check if there's any adjacent tile
+        val neighbors = listOf(
+            Position(position.x, position.y + 1),
+            Position(position.x + 1, position.y),
+            Position(position.x, position.y - 1),
+            Position(position.x - 1, position.y)
+        )
+
+        return neighbors.any { neighbor ->
+            _placedTiles.any { it.position == neighbor }
+        }
+    }
+
+
+}
+*/
+    fun isValidPlacement(position: Position): Boolean {
+        return validPositions.value.contains(position)
+    }
 }
 
-/**
+    /**
  * UI State to handle frontend screen behavior
  */
 sealed class GameUiState {

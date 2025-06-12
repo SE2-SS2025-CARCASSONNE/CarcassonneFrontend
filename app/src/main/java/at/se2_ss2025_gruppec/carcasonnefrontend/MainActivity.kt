@@ -94,6 +94,7 @@ class MainActivity : ComponentActivity() {
                     })
                 }
 
+
                 NavHost(navController = navController, startDestination = "landing") {
                     composable("landing") { LandingScreen(onStartTapped = {
                         navController.navigate("auth") {
@@ -123,7 +124,8 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("gameplay/{gameId}") { backStackEntry ->
                         val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-                        GameplayScreen(gameId)
+                        val playerName = TokenManager.loggedInUsername ?: "Unknown"
+                        GameplayScreen(gameId, playerName)
                     }
                 }
                 GlobalSoundMenu()
@@ -571,6 +573,8 @@ fun CreateGameScreen(navController: NavController) {
 
 @Composable
 fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
+    val gameViewModel: GameViewModel = viewModel()
+
     val players = remember { mutableStateListOf(playerName) }
     val hostName = remember { mutableStateOf("") }
     val clipboardManager = LocalClipboardManager.current
@@ -588,7 +592,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
+                val currentPlayer = json.optString("currentPlayer", playerName)
                 Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName")
+                gameViewModel.setJoinedPlayer(currentPlayer)
+
 
                 Handler(Looper.getMainLooper()).post {
                     players.clear()
@@ -614,6 +621,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
         try {
             Log.d("LobbyScreen", "Sending join_game for $playerName to $gameId")
             stompClient.sendJoinGame(gameId, playerName)
+
         } catch (e: Exception) {
             Log.e("LobbyScreen", "Failed to send join_game: ${e.message}")
             Toast.makeText(context, "Failed to join game: ${e.message}", Toast.LENGTH_LONG).show()
@@ -721,7 +729,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                 Button(
                     onClick = {
                         Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
-                        stompClient.sendStartGame(gameId)
+                        stompClient.sendStartGame(gameId,playerName)
                     },
                     modifier = Modifier
                         .width(200.dp)
@@ -744,15 +752,21 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 @Preview(showBackground = true)
 @Composable
 fun GameplayScreenPreview() {
-    GameplayScreen("123")
+    GameplayScreen("123","admin")
 }
 
 @Composable
-fun GameplayScreen(gameId: String) {
+fun GameplayScreen(gameId: String,playerName: String) {
     val viewModel: GameViewModel = viewModel()
 
     LaunchedEffect(Unit) {
+        viewModel.setJoinedPlayer(playerName)
         viewModel.subscribeToGame(gameId)
+        viewModel.joinGame(gameId, playerName)
+
+
+
+
     }
 
 
@@ -775,7 +789,12 @@ fun GameplayScreen(gameId: String) {
             PannableTileGrid(
                 tiles = placedTiles,
                 onTileClick = { x, y ->
-                    viewModel.placeTileAt(Position(x, y), gameId)
+                    val pos = Position(x, y)
+                    if (viewModel.isValidPlacement(pos)) {
+                        viewModel.placeTileAt(pos, gameId)
+                    } else {
+                        Log.e("Game", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
+                    }
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )

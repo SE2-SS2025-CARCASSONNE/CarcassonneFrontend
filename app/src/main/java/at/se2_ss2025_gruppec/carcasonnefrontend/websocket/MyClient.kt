@@ -19,7 +19,7 @@ import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks) {
 
-    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
+    private val WEBSOCKET_URI = "ws://143.205.196.117:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job
@@ -100,11 +100,11 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
-    fun sendStartGame(gameId: String) {
+    fun sendStartGame(gameId: String,playerId: String) {
         val json = JSONObject().apply {
             put("type", "start_game")
             put("gameId", gameId)
-            put("player", "HOST") //Should be replaced with actual player ID later
+            put("player", playerId)
         }
 
         scope.launch {
@@ -123,8 +123,8 @@ class MyClient(val callbacks: Callbacks) {
                 val flow = activeSession.subscribeText(topic)
 
                 flow.collect { msg ->
-                    Log.d("WebSocket", "✅ Received message on $topic: $msg")
-                    onMessage(msg) // ✅ Forward the full raw message to handler (e.g., handleLobbyMessage)
+                    Log.d("WebSocket", " Received message on $topic: $msg")
+                    onMessage(msg) //  Forward the full raw message to handler (e.g., handleLobbyMessage)
                 }
 
             } catch (e: Exception) {
