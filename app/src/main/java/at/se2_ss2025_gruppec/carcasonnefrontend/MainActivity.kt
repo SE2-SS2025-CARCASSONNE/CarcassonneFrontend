@@ -764,9 +764,6 @@ fun GameplayScreen(gameId: String,playerName: String) {
         viewModel.subscribeToGame(gameId)
         viewModel.joinGame(gameId, playerName)
 
-
-
-
     }
 
 
