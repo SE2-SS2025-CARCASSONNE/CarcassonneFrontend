@@ -5,8 +5,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
@@ -41,7 +43,6 @@ class GameViewModel : ViewModel() {
     fun setValidPositions(positions: List<Position>) {
         _validPositions.value = positions
     }
-
 
     private var joinedPlayerName: String? = null
 
@@ -147,9 +148,11 @@ class GameViewModel : ViewModel() {
                         val playerId = playerJson?.getString("id")
 
                         // Extract position information
+                        val positionJson = tileJson.getJSONObject("position")
+
                         val position = Position(
-                            x = tileJson.getInt("x"),
-                            y = tileJson.getInt("y")
+                            x = positionJson.getInt("x"),
+                            y = positionJson.getInt("y")
                         )
 
                         // Create updated tile with position
@@ -300,10 +303,10 @@ class GameViewModel : ViewModel() {
 
     private fun updateBoardWithTile(tile: Tile, playerId: String?) {
         Log.d("updateBoard", "Placing tile ${tile.id} at ${tile.position}")
+        val position = tile.position ?: return
+
         val currentState = _uiState.value
         if (currentState is GameUiState.Success) {
-            val position = tile.position ?: return
-
             // Update board map with the new tile
             val updatedBoard = currentState.gameState.board.toMutableMap()
             updatedBoard[position] = tile
@@ -336,14 +339,12 @@ class GameViewModel : ViewModel() {
         val tile = _currentTile.value ?: return
         val rotation = _currentRotation.value
 
-
         if (joinedPlayerName == null) {
             Log.e("placeTileAt", " Cannot place tile - player name is null")
             return
         }
 
         val playerId = joinedPlayerName ?: return
-
 
         /*val playerId = (_uiState.value as? GameUiState.Success)?.gameState?.players
             ?.getOrNull((_uiState.value as GameUiState.Success).gameState.currentPlayerIndex)
@@ -381,10 +382,39 @@ class GameViewModel : ViewModel() {
         } else {
             Log.e("WebSocket", "Cannot send tile - WebSocket not connected")
         }
-
-
     }
 
+    fun placeStartTile(drawableRes: Int?) {
+        val startTile = Tile(
+            id = "start_tile",
+            top = "CITY",
+            right = "ROAD",
+            bottom = "FIELD",
+            left = "ROAD",
+            position = Position(0, 0),
+            drawableRes = drawableRes
+        )
+        val initialBoard = mutableMapOf<Position, Tile>()
+        initialBoard[startTile.position!!] = startTile
+
+        val initGameState = GameState(
+            board = initialBoard,
+            id = "test_game",
+            players = listOf(Player(
+                id = "player1",
+                name = "player1",
+                color = Color.Red,
+                score = 0,
+                availableMeeples = 7
+            )),
+            currentPlayerIndex = 0,
+            remainingTiles = listOf(startTile),
+            currentTile = null,
+            meeples = emptyList(),
+            gamePhase = GamePhase.TILE_PLACEMENT
+        )
+        _uiState.value = GameUiState.Success(initGameState)
+    }
 
     fun selectTile(tile: Tile) {
         _selectedTile.value = tile

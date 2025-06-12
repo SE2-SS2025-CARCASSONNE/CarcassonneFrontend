@@ -1,6 +1,9 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -47,7 +50,11 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.NativeCanvas
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
@@ -69,10 +76,13 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
+import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameUiState
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.bottomColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.leftColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.topColor
+import androidx.core.graphics.withSave
+import androidx.core.graphics.createBitmap
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -756,16 +766,15 @@ fun GameplayScreenPreview() {
 }
 
 @Composable
-fun GameplayScreen(gameId: String,playerName: String) {
+fun GameplayScreen(gameId: String, playerName: String) {
     val viewModel: GameViewModel = viewModel()
 
     LaunchedEffect(Unit) {
         viewModel.setJoinedPlayer(playerName)
         viewModel.subscribeToGame(gameId)
         viewModel.joinGame(gameId, playerName)
-
+        viewModel.placeStartTile(R.drawable.tile_d)
     }
-
 
     Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
@@ -781,20 +790,25 @@ fun GameplayScreen(gameId: String,playerName: String) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            val placedTiles = viewModel.placedTiles
+            val uiState by viewModel.uiState.collectAsState()
 
-            PannableTileGrid(
-                tiles = placedTiles,
-                onTileClick = { x, y ->
-                    val pos = Position(x, y)
-                    if (viewModel.isValidPlacement(pos)) {
-                        viewModel.placeTileAt(pos, gameId)
-                    } else {
-                        Log.e("Game", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
-                    }
-                },
-                modifier = Modifier.weight(1f).fillMaxWidth()
-            )
+            if (uiState is GameUiState.Success) {
+                val gameState = (uiState as GameUiState.Success).gameState
+                val placedTiles = gameState.board.values.toList()
+
+                PannableTileGrid(
+                    tiles = placedTiles,
+                    onTileClick = { x, y ->
+                        val pos = Position(x, y)
+                        if (viewModel.isValidPlacement(pos)) {
+                            viewModel.placeTileAt(pos, gameId)
+                        } else {
+                            Log.e("Game", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
+                        }
+                    },
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -879,11 +893,12 @@ fun TileBackButton(
     }
 }
 
+@SuppressLint("DiscouragedApi")
 @Composable
 fun PannableTileGrid(
     tiles: List<Tile>,
     onTileClick: (Int, Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val tileSize = 100.dp
     val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
@@ -897,16 +912,16 @@ fun PannableTileGrid(
     val gestureModifier = Modifier
         .pointerInput(Unit) {
             detectTransformGestures { _, pan, zoom, _ ->
-                scale.floatValue *= zoom
-                offsetX.floatValue += pan.x
-                offsetY.floatValue += pan.y
+                scale.value *= zoom
+                offsetX.value += pan.x
+                offsetY.value += pan.y
             }
         }
         .pointerInput(Unit) {
             detectTapGestures { offset ->
-                val tileSizePxScaled = tileSizePx * scale.floatValue
-                val x = ((offset.x - offsetX.floatValue) / tileSizePxScaled).toInt()
-                val y = ((offset.y - offsetY.floatValue) / tileSizePxScaled).toInt()
+                val scaledTileSizePx = tileSizePx * scale.value
+                val x = ((offset.x - offsetX.value) / scaledTileSizePx).toInt()
+                val y = ((offset.y - offsetY.value) / scaledTileSizePx).toInt()
                 onTileClick(x, y)
             }
         }
@@ -917,39 +932,46 @@ fun PannableTileGrid(
             .then(gestureModifier)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val scaledTileSizePx = tileSizePx * scale.floatValue
+            val scaledTileSizePx = (tileSizePx * scale.value).coerceAtLeast(1f)
 
             tiles.forEach { tile ->
-                val position = tile.position ?: return@forEach
-                val x = position.x
-                val y = position.y
-                val left = x * scaledTileSizePx + offsetX.floatValue
-                val top = y * scaledTileSizePx + offsetY.floatValue
+                val pos = tile.position ?: return@forEach
+                val left = pos.x * scaledTileSizePx + offsetX.value
+                val top  = pos.y * scaledTileSizePx + offsetY.value
 
-                val image = tile.drawableRes?.let { resId ->
-                    imageCache.getOrPut(resId) {
-                        ContextCompat.getDrawable(context, resId)?.toBitmap()
-                            ?.asImageBitmap() ?: ImageBitmap(1, 1)
-                    }
+                val baseName = tile.id.substringBeforeLast("-").replace("-", "_")
+                val derivedId = context.resources
+                    .getIdentifier(baseName, "drawable", context.packageName)
+
+                val resId = tile.drawableRes?.takeIf { it != 0 } ?: derivedId
+                if (resId == 0) return@forEach
+
+                val img = imageCache.getOrPut(resId) {
+                    val dr = ContextCompat.getDrawable(context, resId)!!
+                    val bmp = drawableToBitmap(dr, scaledTileSizePx.toInt(), scaledTileSizePx.toInt())
+                    bmp.asImageBitmap()
                 }
 
-                if (image != null) {
-                    drawImage(
-                        image = image,
-                        dstOffset = IntOffset(left.toInt(), top.toInt()),
-                        dstSize = IntSize(scaledTileSizePx.toInt(), scaledTileSizePx.toInt())
-                    )
-                } else {
-                    drawRect(
-                        color = Color.Gray,
-                        topLeft = Offset(left, top),
-                        size = Size(scaledTileSizePx, scaledTileSizePx)
-                    )
+                withTransform({
+                    translate(left, top)
+                    rotate(tile.tileRotation.degrees.toFloat(), pivot = Offset(scaledTileSizePx/2, scaledTileSizePx/2))
+                }) {
+                    drawImage(img, dstSize = IntSize(scaledTileSizePx.toInt(), scaledTileSizePx.toInt()))
                 }
             }
         }
     }
 }
+
+fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
+    if (drawable is BitmapDrawable) return drawable.bitmap
+    val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bmp)
+    drawable.setBounds(0, 0, width, height)
+    drawable.draw(canvas)
+    return bmp
+}
+
 
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel) {
@@ -998,12 +1020,7 @@ fun BottomScreenBar(viewModel: GameViewModel) {
             ) {
                 tile?.let {
                     DrawTile(it, viewModel)
-                } ?: Image(
-                    painter = painterResource(id = R.drawable.tile_back),
-                    contentDescription = "Demo Tile",
-                    contentScale = ContentScale.FillBounds,
-                    modifier = Modifier.size(135.dp)
-                )
+                }
             }
 
             // Rechte Seite: Karte + Punkt-Badge
