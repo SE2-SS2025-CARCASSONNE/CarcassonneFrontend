@@ -62,6 +62,10 @@ class GameViewModel : ViewModel() {
     private val _selectedMeeple = MutableStateFlow<Meeple?>(null)
     val selectedMeeple: StateFlow<Meeple?> = _selectedMeeple
 
+    private val _currentPlayerId = mutableStateOf<String?>(null)
+    val currentPlayerId: State<String?> = _currentPlayerId
+
+
     private lateinit var webSocketClient: MyClient
 
     init {
@@ -113,6 +117,12 @@ class GameViewModel : ViewModel() {
                         // Extract player information if needed
                         val playerJson = json.optJSONObject("player")
                         val playerId = playerJson?.getString("id")
+
+                        //set currentPlayer on PlayerID
+
+                        if (playerId != null) {
+                            setCurrentPlayerId(playerId)
+                        }
 
                         // Extract position information
                         val position = Position(
@@ -304,6 +314,9 @@ class GameViewModel : ViewModel() {
     fun selectTile(tile: Tile) {
         _selectedTile.value = tile
         _currentRotation.value = TileRotation.NORTH
+    }
+    fun setCurrentPlayerId(id: String) {
+        _currentPlayerId.value = id
     }
 
     private fun handleScoreUpdateMessage(json: JSONObject) {

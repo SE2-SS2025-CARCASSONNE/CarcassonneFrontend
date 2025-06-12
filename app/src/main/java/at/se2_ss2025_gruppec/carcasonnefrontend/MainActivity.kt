@@ -947,6 +947,9 @@ fun PannableTileGrid(
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel) {
     val tile = viewModel.currentTile.value
+    val currentPlayerId = viewModel.currentPlayerId.value
+    val players = viewModel.players
+    val currentPlayer = players.find { it.id == currentPlayerId }
 
     Box(
         modifier = Modifier
@@ -1027,7 +1030,7 @@ fun BottomScreenBar(viewModel: GameViewModel) {
                             .padding(horizontal = 25.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "10P",
+                            text = "${currentPlayer?.score ?: 0}P",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
