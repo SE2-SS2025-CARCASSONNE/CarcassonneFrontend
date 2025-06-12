@@ -12,6 +12,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -578,13 +579,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
             delay(100)
         }
 
-        //Subscribe to both public and private channels
         stompClient.listenOn("/topic/game/$gameId") { handleLobbyMessage(it) }
         stompClient.listenOn("/user/queue/private") { handleLobbyMessage(it) }
-        delay(700) //In order to give time for subscription to happen
-        //Send join AFTER subscriptions
+        delay(700)
         try {
-            Log.d("LobbyScreen", "Sending join_game for $playerName to $gameId")
             stompClient.sendJoinGame(gameId, playerName)
         } catch (e: Exception) {
             Log.e("LobbyScreen", "Failed to send join_game: ${e.message}")
@@ -598,119 +596,106 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
     ) {
         BackgroundImage()
 
-        Text(
-            text = "Lobby",
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Serif,
-            letterSpacing = 2.sp,
-            color = Color(0xFFFFF4C2),
+        PixelArtTitle(
+            title = "Game Lobby",
+            backgroundRes = R.drawable.bg_pxart,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 65.dp)
-                .padding(start = 150.dp)
                 .align(Alignment.TopCenter)
+                .padding(top = 54.dp)
         )
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 80.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(top = 228.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .border(2.dp, Color(0xFFFFF4C2), RoundedCornerShape(12.dp))
-                        .padding(12.dp)
-                        .background(Color(0x99000000))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(2.dp, Color(0xFFFFF4C2)),
+                colors = CardDefaults.cardColors(containerColor = Color(0x66000000)),
+                modifier = Modifier
+                    .padding(bottom = 24.dp)
+                    .fillMaxWidth(0.6f)
+                    .height(70.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "Game ID: $gameId",
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFFFF4C2)
                     )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(onClick = {
-                    clipboardManager.setText(AnnotatedString(gameId))
-                    Toast.makeText(context, "Copied Game ID", Toast.LENGTH_SHORT).show()
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "Copy Game ID",
-                        tint = Color.White
-                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    IconButton(onClick = {
+                        clipboardManager.setText(AnnotatedString(gameId))
+                        Toast.makeText(context, "Copied Game ID", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy Game ID",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Waiting for players...",
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
+                text = "Waiting for players to join...",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
                 color = Color.White
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             val maxPlayers = 4
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                for (i in 0 until maxPlayers) {
+                    val playerNameInList = players.getOrNull(i) ?: "Empty Slot"
+                    val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
 
-            for (i in 0 until maxPlayers) {
-                val playerNameInList = players.getOrNull(i) ?: "Empty Slot"
-                val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
-
-                Button(
-                    onClick = { },
-                    enabled = false,
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .height(48.dp)
-                        .padding(vertical = 6.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0x995A3A1A),
-                        disabledContainerColor = Color(0x995A3A1A),
-                        disabledContentColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = displayName,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFFF4C2)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0x995A3A1A)),
+                        modifier = Modifier
+                            .fillMaxWidth(0.6f)
+                            .height(50.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = displayName,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(68.dp))
+            Spacer(modifier = Modifier.height(56.dp))
 
             if (hostName.value == playerName) {
-                Button(
+                PixelArtButton(
+                    label = "Start Game",
                     onClick = {
                         Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
                         stompClient.sendStartGame(gameId)
-                    },
-                    modifier = Modifier
-                        .width(200.dp)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC5A3A1A))
-                ) {
-                    Text(
-                        text = "Start Game",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    }
+                )
             }
+
         }
     }
 }
-}
+
 
 @Preview(showBackground = true)
 @Composable
@@ -1222,6 +1207,35 @@ fun TileBackButton(
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
             color = Color.White,
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+@Composable
+fun PixelArtTitle(
+    title: String,
+    backgroundRes: Int = R.drawable.bg_pxart,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .width(260.dp)
+            .height(80.dp)
+    ) {
+        Image(
+            painter = painterResource(id = backgroundRes),
+            contentDescription = "Lobby Title Background",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
+
+        Text(
+            text = title,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 2.sp,
+            color = Color(0xFFFFF4C2),
+            fontFamily = FontFamily.Serif,
             modifier = Modifier.align(Alignment.Center)
         )
     }
