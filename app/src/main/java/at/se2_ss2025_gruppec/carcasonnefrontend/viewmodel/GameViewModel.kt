@@ -289,36 +289,47 @@ class GameViewModel : ViewModel() {
     }
 
     private fun updateBoardWithTile(tile: Tile, playerId: String?) {
-        Log.d("updateBoard", "Placing tile ${tile.id} at ${tile.position}")
         val position = tile.position ?: return
+        Log.d("GameViewModel", "updateBoardWithTile: placing ${tile.id} at $position")
 
+        // Get old board or initialize new one & place tile
         val currentState = _uiState.value
-        if (currentState is GameUiState.Success) {
-            // Update board map with the new tile
-            val updatedBoard = currentState.gameState.board.toMutableMap()
-            updatedBoard[position] = tile
+        val updatedBoard = when (currentState) {
+            is GameUiState.Success -> currentState.gameState.board.toMutableMap()
+            else -> mutableMapOf()
+        }
+        updatedBoard[position] = tile
 
-            // Create new game state with updated board
-            val updatedGameState = currentState.gameState.copy(
+        // Create new game state with updated board
+        val updatedGameState = when (currentState) {
+            is GameUiState.Success -> currentState.gameState.copy(
                 board = updatedBoard,
                 currentTile = null // Clear current tile after placement
             )
-
-            // Emit updated UI state
-            _uiState.value = GameUiState.Success(updatedGameState)
-
-            // Sync placed tiles with updated board
-            _placedTiles.clear()
-            _placedTiles.addAll(updatedBoard.values)
-
-            // Clear selections
-            _selectedTile.value = null
-            _currentTile.value = null
-
-            Log.d("GameViewModel", "Board updated with tile ${tile.id} at $position")
-        } else {
-            Log.e("GameViewModel", "Cannot update board - Game state is not in Success")
+            else -> GameState(
+                id = "unknown_game",
+                players = listOf(Player(playerId ?: "host", playerId ?: "host", Color.White)),
+                currentPlayerIndex = 0,
+                board = updatedBoard,
+                remainingTiles = emptyList(),
+                currentTile = null,
+                meeples = emptyList(),
+                gamePhase = GamePhase.TILE_PLACEMENT
+            )
         }
+
+        // Emit updated UI state
+        _uiState.value = GameUiState.Success(updatedGameState)
+
+        // Sync placed tiles with updated board
+        _placedTiles.clear()
+        _placedTiles.addAll(updatedBoard.values)
+
+        // Clear selections
+        _selectedTile.value = null
+        _currentTile.value = null
+
+        Log.d("GameViewModel", "Board now has ${updatedBoard.size} placed tiles")
     }
 
     fun placeTileAt(position: Position, gameId: String) {
@@ -375,9 +386,9 @@ class GameViewModel : ViewModel() {
 
         // Check if there's any adjacent tile
         val neighbors = listOf(
-            Position(position.x, position.y + 1),
-            Position(position.x + 1, position.y),
             Position(position.x, position.y - 1),
+            Position(position.x + 1, position.y),
+            Position(position.x, position.y + 1),
             Position(position.x - 1, position.y)
         )
 
