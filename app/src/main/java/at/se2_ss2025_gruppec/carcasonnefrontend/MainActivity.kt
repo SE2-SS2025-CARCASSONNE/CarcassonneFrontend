@@ -64,7 +64,6 @@ import kotlinx.coroutines.launch
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.delay
 import org.json.JSONObject
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
@@ -128,9 +127,16 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     composable("gameplay/{gameId}") { backStackEntry ->
-                        val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
-                        val playerName = TokenManager.loggedInUsername ?: "Unknown"
-                        GameplayScreen(gameId, playerName)
+                        val gameId = backStackEntry.arguments!!.getString("gameId")!!
+                        val playerName = TokenManager.loggedInUsername!!
+                        val client = stompClient
+                            ?: throw IllegalStateException("Stomp client not initialized yet!")
+                        GameplayScreen(
+                            gameId      = gameId,
+                            playerName  = playerName,
+                            stompClient = client,
+                            navController = navController
+                        )
                     }
                 }
                 GlobalSoundMenu()
@@ -576,9 +582,14 @@ fun CreateGameScreen(navController: NavController) {
     }
 }
 
+@SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
-    val gameViewModel: GameViewModel = viewModel()
+
+    val backStackEntry = remember(navController, gameId) {
+        navController.getBackStackEntry("lobby/$gameId")
+    }
+    val viewModel: GameViewModel = viewModel(backStackEntry)
 
     val players = remember { mutableStateListOf(playerName) }
     val hostName = remember { mutableStateOf("") }
@@ -599,8 +610,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                 val host = json.optString("host", "")
                 val currentPlayer = json.optString("currentPlayer", playerName)
                 Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName")
-                gameViewModel.setJoinedPlayer(currentPlayer)
-
+                viewModel.setJoinedPlayer(currentPlayer)
 
                 Handler(Looper.getMainLooper()).post {
                     players.clear()
@@ -754,21 +764,21 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
     }
 }
 
-@Preview(showBackground = true)
+@SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
-fun GameplayScreenPreview() {
-    GameplayScreen("123","admin")
-}
+fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
 
-@Composable
-fun GameplayScreen(gameId: String, playerName: String) {
-    val viewModel: GameViewModel = viewModel()
+    val backStackEntry = remember(navController, gameId) {
+        navController.getBackStackEntry("lobby/$gameId")
+    }
+    val viewModel: GameViewModel = viewModel(backStackEntry)
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(gameId) {
+        viewModel.setWebSocketClient(stompClient)
         viewModel.setJoinedPlayer(playerName)
         viewModel.subscribeToGame(gameId)
+        viewModel.subscribeToPrivate()
         viewModel.joinGame(gameId, playerName)
-        viewModel.placeStartTile(R.drawable.tile_d)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

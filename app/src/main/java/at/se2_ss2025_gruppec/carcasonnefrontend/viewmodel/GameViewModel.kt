@@ -76,6 +76,12 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    fun subscribeToPrivate() {
+        webSocketClient.listenOn("/user/queue/private") { msg ->
+            handleWebSocketMessage(msg)
+        }
+    }
+
     fun requestTileFromBackend(gameId: String, playerId: String) {
         if (webSocketClient.isConnected()) {
             webSocketClient.sendDrawTileRequest(gameId, playerId)
