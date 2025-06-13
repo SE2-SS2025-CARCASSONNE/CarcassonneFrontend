@@ -51,6 +51,9 @@ class GameViewModel : ViewModel() {
     private val _currentTile = mutableStateOf<Tile?>(null)
     val currentTile: State<Tile?> get() = _currentTile
 
+    private val _validPlacements = MutableStateFlow<List<Pair<Position,TileRotation>>>(emptyList())
+    val validPlacements: StateFlow<List<Pair<Position,TileRotation>>> = _validPlacements
+
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState
 
@@ -105,16 +108,18 @@ class GameViewModel : ViewModel() {
                     val tileJson = json.getJSONObject("tile")
                     val tile = parseTileFromJson(tileJson)
                     onTileDrawn(tile)
-                    val validPositionsList = mutableListOf<Position>()
-                    if (json.has("validPositions")) {
-                        val validPositionsJson = json.getJSONArray("validPositions")
-                        for (i in 0 until validPositionsJson.length()) {
-                            val posObj = validPositionsJson.getJSONObject(i)
-                            val x = posObj.getInt("x")
-                            val y = posObj.getInt("y")
-                            validPositionsList.add(Position(x, y))
+
+                    if (json.has("validPlacements")) {
+                        val validPlacementsJson = json.getJSONArray("validPlacements")
+                        val validPlacementList = mutableListOf<Pair<Position,TileRotation>>()
+                        for (i in 0 until validPlacementsJson.length()) {
+                            val temp = validPlacementsJson.getJSONObject(i)
+                            val posObj = temp.getJSONObject("position")
+                            val position = Position(posObj.getInt("x"), posObj.getInt("y"))
+                            val rotation = TileRotation.valueOf(temp.getString("rotation"))
+                            validPlacementList += position to rotation
                         }
-                        setValidPositions(validPositionsList)
+                        _validPlacements.value = validPlacementList
                     }
                 }
 
@@ -358,6 +363,13 @@ class GameViewModel : ViewModel() {
     }
 
     fun isValidPlacement(position: Position): Boolean {
+        if (_currentTile.value == null) return false
+
+        val listFromServer = _validPlacements.value
+        if (listFromServer.isNotEmpty()) {
+            return listFromServer.any { it.first == position }
+        }
+
         // Disallow placing on already occupied position
         if (_placedTiles.any { it.position == position }) return false
 
