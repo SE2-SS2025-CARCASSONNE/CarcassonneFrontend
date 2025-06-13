@@ -65,9 +65,6 @@ class GameViewModel : ViewModel() {
     private val _selectedTile = MutableStateFlow<Tile?>(null)
     val selectedTile: StateFlow<Tile?> = _selectedTile
 
-    private val _currentRotation = MutableStateFlow(TileRotation.NORTH)
-    val currentRotation: StateFlow<TileRotation> = _currentRotation
-
     private val _selectedMeeple = MutableStateFlow<Meeple?>(null)
     val selectedMeeple: StateFlow<Meeple?> = _selectedMeeple
 
@@ -132,7 +129,7 @@ class GameViewModel : ViewModel() {
                             val y = posObj.getInt("y")
                             validPositionsList.add(Position(x, y))
                         }
-                        setValidPositions(validPositionsList) // <--- Implement this in your ViewModel
+                        setValidPositions(validPositionsList)
                     }
                 }
 
@@ -337,7 +334,6 @@ class GameViewModel : ViewModel() {
     fun placeTileAt(position: Position, gameId: String) {
         Log.d("ViewModel", "placeTileAt called with $position")
         val tile = _currentTile.value ?: return
-        val rotation = _currentRotation.value
 
         if (joinedPlayerName == null) {
             Log.e("placeTileAt", " Cannot place tile - player name is null")
@@ -345,11 +341,6 @@ class GameViewModel : ViewModel() {
         }
 
         val playerId = joinedPlayerName ?: return
-
-        /*val playerId = (_uiState.value as? GameUiState.Success)?.gameState?.players
-            ?.getOrNull((_uiState.value as GameUiState.Success).gameState.currentPlayerIndex)
-            ?.id ?: return*/
-        //val playerId = "dummy-id" // Dummy playerId, since commented-out playerId above causes function to return (problem with missing GameState)
 
         Log.d("placeTileAt", "Placing tile at $position for playerId = $playerId")
 
@@ -363,19 +354,16 @@ class GameViewModel : ViewModel() {
                 put("terrainEast", tile.right)
                 put("terrainSouth", tile.bottom)
                 put("terrainWest", tile.left)
-                put("tileRotation", rotation.name)
+                put("tileRotation", tile.tileRotation)
                 put("hasMonastery", tile.hasMonastery)
                 put("hasShield", tile.hasShield)
                 put("position", JSONObject().apply {
                     put("x", position.x)
                     put("y", position.y)
-
                 })
             })
         }
 
-        /* if (webSocketClient.isConnected())
-            webSocketClient.sendPlaceTileRequest(payload.toString())*/
         if (webSocketClient.isConnected()) {
             webSocketClient.sendPlaceTileRequest(payload.toString())
             Log.d("WebSocket", "Tile placement request sent: $payload")
@@ -394,19 +382,23 @@ class GameViewModel : ViewModel() {
             position = Position(0, 0),
             drawableRes = drawableRes
         )
+        _placedTiles.add(startTile)
+
         val initialBoard = mutableMapOf<Position, Tile>()
         initialBoard[startTile.position!!] = startTile
 
         val initGameState = GameState(
             board = initialBoard,
             id = "test_game",
-            players = listOf(Player(
-                id = "player1",
-                name = "player1",
-                color = Color.Red,
-                score = 0,
-                availableMeeples = 7
-            )),
+            players = listOf(
+                Player(
+                    id = "player1",
+                    name = "player1",
+                    color = Color.Red,
+                    score = 0,
+                    availableMeeples = 7
+                )
+            ),
             currentPlayerIndex = 0,
             remainingTiles = listOf(startTile),
             currentTile = null,
@@ -416,12 +408,6 @@ class GameViewModel : ViewModel() {
         _uiState.value = GameUiState.Success(initGameState)
     }
 
-    fun selectTile(tile: Tile) {
-        _selectedTile.value = tile
-        _currentRotation.value = TileRotation.NORTH
-    }
-
-    /*
     fun isValidPlacement(position: Position): Boolean {
         // Disallow placing on already occupied position
         if (_placedTiles.any { it.position == position }) return false
@@ -439,14 +425,11 @@ class GameViewModel : ViewModel() {
         }
     }
 
-
-}
-*/
+    /*
     fun isValidPlacement(position: Position): Boolean {
         return validPositions.value.contains(position)
-    }
+    }*/
 }
-
     /**
  * UI State to handle frontend screen behavior
  */

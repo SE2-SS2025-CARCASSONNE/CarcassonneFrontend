@@ -50,11 +50,8 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.NativeCanvas
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
@@ -68,10 +65,8 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
@@ -81,7 +76,7 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.bottomColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.leftColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.topColor
-import androidx.core.graphics.withSave
+import kotlin.math.floor
 import androidx.core.graphics.createBitmap
 
 class MainActivity : ComponentActivity() {
@@ -920,8 +915,8 @@ fun PannableTileGrid(
         .pointerInput(Unit) {
             detectTapGestures { offset ->
                 val scaledTileSizePx = tileSizePx * scale.value
-                val x = ((offset.x - offsetX.value) / scaledTileSizePx).toInt()
-                val y = ((offset.y - offsetY.value) / scaledTileSizePx).toInt()
+                val x = floor((offset.x - offsetX.value) / scaledTileSizePx).toInt()
+                val y = floor((offset.y - offsetY.value) / scaledTileSizePx).toInt()
                 onTileClick(x, y)
             }
         }
@@ -940,23 +935,22 @@ fun PannableTileGrid(
                 val top  = pos.y * scaledTileSizePx + offsetY.value
 
                 val baseName = tile.id.substringBeforeLast("-").replace("-", "_")
-                val derivedId = context.resources
-                    .getIdentifier(baseName, "drawable", context.packageName)
+                val derivedId = context.resources.getIdentifier(baseName, "drawable", context.packageName)
 
                 val resId = tile.drawableRes?.takeIf { it != 0 } ?: derivedId
                 if (resId == 0) return@forEach
 
-                val img = imageCache.getOrPut(resId) {
-                    val dr = ContextCompat.getDrawable(context, resId)!!
-                    val bmp = drawableToBitmap(dr, scaledTileSizePx.toInt(), scaledTileSizePx.toInt())
-                    bmp.asImageBitmap()
+                val image = imageCache.getOrPut(resId) {
+                    val drawable = ContextCompat.getDrawable(context, resId)!!
+                    val bitmap = drawableToBitmap(drawable, scaledTileSizePx.toInt(), scaledTileSizePx.toInt())
+                    bitmap.asImageBitmap()
                 }
 
                 withTransform({
                     translate(left, top)
                     rotate(tile.tileRotation.degrees.toFloat(), pivot = Offset(scaledTileSizePx/2, scaledTileSizePx/2))
                 }) {
-                    drawImage(img, dstSize = IntSize(scaledTileSizePx.toInt(), scaledTileSizePx.toInt()))
+                    drawImage(image, dstSize = IntSize(scaledTileSizePx.toInt(), scaledTileSizePx.toInt()))
                 }
             }
         }
@@ -965,11 +959,11 @@ fun PannableTileGrid(
 
 fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
     if (drawable is BitmapDrawable) return drawable.bitmap
-    val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val canvas = android.graphics.Canvas(bmp)
+    val bitmap = createBitmap(width, height)
+    val canvas = android.graphics.Canvas(bitmap)
     drawable.setBounds(0, 0, width, height)
     drawable.draw(canvas)
-    return bmp
+    return bitmap
 }
 
 
