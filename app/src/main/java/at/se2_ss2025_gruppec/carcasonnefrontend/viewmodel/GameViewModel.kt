@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
@@ -12,11 +11,9 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
-import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 fun getDrawableNameForTile(tile: Tile): String {
@@ -38,11 +35,6 @@ fun directionToColor(type: String): Color = when (type) {
 }
 
 class GameViewModel : ViewModel() {
-    private val _validPositions = mutableStateOf<List<Position>>(emptyList())
-    val validPositions: State<List<Position>> = _validPositions
-    fun setValidPositions(positions: List<Position>) {
-        _validPositions.value = positions
-    }
 
     private var joinedPlayerName: String? = null
 
@@ -76,19 +68,6 @@ class GameViewModel : ViewModel() {
 
     fun joinGame(gameId: String, playerName: String) {
         webSocketClient.sendJoinGame(gameId, playerName)
-    }
-
-
-    init {
-        viewModelScope.launch {
-            webSocketClient = MyClient(object : Callbacks {
-                override fun onResponse(msg: String) {
-                    handleWebSocketMessage(msg)
-                }
-
-            })
-            webSocketClient.connect()
-        }
     }
 
     fun subscribeToGame(gameId: String) {
@@ -372,42 +351,6 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    fun placeStartTile(drawableRes: Int?) {
-        val startTile = Tile(
-            id = "start_tile",
-            top = "CITY",
-            right = "ROAD",
-            bottom = "FIELD",
-            left = "ROAD",
-            position = Position(0, 0),
-            drawableRes = drawableRes
-        )
-        _placedTiles.add(startTile)
-
-        val initialBoard = mutableMapOf<Position, Tile>()
-        initialBoard[startTile.position!!] = startTile
-
-        val initGameState = GameState(
-            board = initialBoard,
-            id = "test_game",
-            players = listOf(
-                Player(
-                    id = "player1",
-                    name = "player1",
-                    color = Color.Red,
-                    score = 0,
-                    availableMeeples = 7
-                )
-            ),
-            currentPlayerIndex = 0,
-            remainingTiles = listOf(startTile),
-            currentTile = null,
-            meeples = emptyList(),
-            gamePhase = GamePhase.TILE_PLACEMENT
-        )
-        _uiState.value = GameUiState.Success(initGameState)
-    }
-
     fun isValidPlacement(position: Position): Boolean {
         // Disallow placing on already occupied position
         if (_placedTiles.any { it.position == position }) return false
@@ -424,12 +367,8 @@ class GameViewModel : ViewModel() {
             _placedTiles.any { it.position == neighbor }
         }
     }
-
-    /*
-    fun isValidPlacement(position: Position): Boolean {
-        return validPositions.value.contains(position)
-    }*/
 }
+
     /**
  * UI State to handle frontend screen behavior
  */

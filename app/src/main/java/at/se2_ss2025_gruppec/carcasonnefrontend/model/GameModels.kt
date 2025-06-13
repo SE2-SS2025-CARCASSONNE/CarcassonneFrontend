@@ -14,7 +14,7 @@ enum class TerrainType {
     ROAD,
     CITY,
     MONASTERY,
-    FIELD,
+    FIELD
 }
 
 enum class TileRotation(val degrees: Int) {

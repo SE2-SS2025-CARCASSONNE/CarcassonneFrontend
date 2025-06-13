@@ -836,7 +836,7 @@ fun PlayerRow() {
 
 @Composable
 fun TileBackRow(viewModel: GameViewModel, gameId: String) {
-    val counters = remember { List(4) { mutableIntStateOf(18) } }
+    val counters = remember { listOf(mutableIntStateOf(18), mutableIntStateOf(18), mutableIntStateOf(18), mutableIntStateOf(17)) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
