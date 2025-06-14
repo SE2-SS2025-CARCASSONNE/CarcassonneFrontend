@@ -327,10 +327,6 @@ class GameViewModel : ViewModel() {
 
     fun Tile.rotateClockwise(): Tile {
         return this.copy(
-            top = left,
-            right = top,
-            bottom = right,
-            left = bottom,
             tileRotation = when (tileRotation) {
                 TileRotation.NORTH -> TileRotation.EAST
                 TileRotation.EAST -> TileRotation.SOUTH
