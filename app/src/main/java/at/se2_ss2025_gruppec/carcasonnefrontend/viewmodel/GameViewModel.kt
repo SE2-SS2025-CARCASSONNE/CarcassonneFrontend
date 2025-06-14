@@ -376,11 +376,6 @@ class GameViewModel : ViewModel() {
     fun isValidPlacement(position: Position): Boolean {
         if (_currentTile.value == null) return false
 
-        val listFromServer = _validPlacements.value
-        if (listFromServer.isNotEmpty()) {
-            return listFromServer.any { it.first == position }
-        }
-
         // Disallow placing on already occupied position
         if (_placedTiles.any { it.position == position }) return false
 
