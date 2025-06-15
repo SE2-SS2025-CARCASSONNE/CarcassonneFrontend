@@ -319,7 +319,7 @@ class GameViewModel : ViewModel() {
         _currentPlayerId.value = id
     }
 
-    private fun handleScoreUpdateMessage(json: JSONObject) {
+    fun handleScoreUpdateMessage(json: JSONObject) {
         val scoreArray = json.getJSONArray("scores")
         val updatedPlayers = mutableListOf<Player>()
         for (i in 0 until scoreArray.length()) {
