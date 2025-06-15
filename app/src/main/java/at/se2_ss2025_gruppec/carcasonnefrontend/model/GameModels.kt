@@ -14,7 +14,7 @@ enum class TerrainType {
     ROAD,
     CITY,
     MONASTERY,
-    FIELD,
+    FIELD
 }
 
 enum class TileRotation(val degrees: Int) {
@@ -35,13 +35,14 @@ data class Tile(
     val hasMonastery: Boolean = false,
     val hasShield: Boolean = false,
     val tileRotation: TileRotation = TileRotation.NORTH,
-    val position: Position? = null
+    val position: Position? = null,
+    val drawableRes: Int? = null
 )
 
 enum class MeepleType {
     KNIGHT,
     THIEF,
-    MONK,
+    MONK
 }
 
 enum class MeeplePosition {

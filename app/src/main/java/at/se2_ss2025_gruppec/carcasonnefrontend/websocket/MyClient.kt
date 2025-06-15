@@ -100,11 +100,11 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
-    fun sendStartGame(gameId: String) {
+    fun sendStartGame(gameId: String,playerId: String) {
         val json = JSONObject().apply {
             put("type", "start_game")
             put("gameId", gameId)
-            put("player", "HOST") //Should be replaced with actual player ID later
+            put("player", playerId)
         }
 
         scope.launch {
@@ -123,8 +123,8 @@ class MyClient(val callbacks: Callbacks) {
                 val flow = activeSession.subscribeText(topic)
 
                 flow.collect { msg ->
-                    Log.d("WebSocket", "✅ Received message on $topic: $msg")
-                    onMessage(msg) // ✅ Forward the full raw message to handler (e.g., handleLobbyMessage)
+                    Log.d("WebSocket", "Received message on $topic: $msg")
+                    onMessage(msg) // Forward the full raw message to handler (e.g., handleLobbyMessage)
                 }
 
             } catch (e: Exception) {
@@ -172,6 +172,18 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+    fun sendPlaceTileRequest(payload: String){
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", payload)
+                Log.d("WebSocket", "Tile placement request sent: $payload")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send tile placement request: ${e.message}")
+
+            }
+        }
+    }
+
     fun sendCalculateScoreRequest(gameId: String) {
         val json = JSONObject().apply {
             put("type", "calculate_score")
@@ -187,5 +199,4 @@ class MyClient(val callbacks: Callbacks) {
             }
         }
     }
-
 }
