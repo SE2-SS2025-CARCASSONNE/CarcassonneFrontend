@@ -7,9 +7,9 @@ import androidx.lifecycle.ViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
-import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +62,12 @@ class GameViewModel : ViewModel() {
 
     private val _selectedMeeple = MutableStateFlow<Meeple?>(null)
     val selectedMeeple: StateFlow<Meeple?> = _selectedMeeple
+
+    private val _players = mutableStateListOf<Player>()
+    val players: List<Player> get() = _players
+
+    private val _currentPlayerId = mutableStateOf<String?>(null)
+    val currentPlayerId: State<String?> = _currentPlayerId
 
     private lateinit var webSocketClient: MyClient
 
@@ -387,9 +393,34 @@ class GameViewModel : ViewModel() {
             _placedTiles.any { it.position == neighbor }
         }
     }
+
+    fun setCurrentPlayerId(id: String) {
+        _currentPlayerId.value = id
+    }
+
+    fun handleScoreUpdateMessage(json: JSONObject) {
+        val scoreArray = json.getJSONArray("scores")
+        val updatedPlayers = mutableListOf<Player>()
+        for (i in 0 until scoreArray.length()) {
+            val obj = scoreArray.getJSONObject(i)
+            val player = Player(
+                id = obj.getString("id"),
+                name = "", //Dummy Werte bis zu Refactorn
+                color = Color.Black,   //TODO Refactoren
+                score = obj.getInt("score"),
+                availableMeeples = obj.optInt("remainingMeeple", 0),
+               // userId = if (obj.has("user_id")) obj.getInt("user_id") else null
+            )
+            updatedPlayers.add(player)
+        }
+
+        _players.clear()
+        _players.addAll(updatedPlayers)
+        Log.d("WebSocket", "Updated player scores: $_players")
+    }
 }
 
-    /**
+/**
  * UI State to handle frontend screen behavior
  */
 sealed class GameUiState {

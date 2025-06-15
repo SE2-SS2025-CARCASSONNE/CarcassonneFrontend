@@ -123,8 +123,8 @@ class MyClient(val callbacks: Callbacks) {
                 val flow = activeSession.subscribeText(topic)
 
                 flow.collect { msg ->
-                    Log.d("WebSocket", " Received message on $topic: $msg")
-                    onMessage(msg) //  Forward the full raw message to handler (e.g., handleLobbyMessage)
+                    Log.d("WebSocket", "Received message on $topic: $msg")
+                    onMessage(msg) // Forward the full raw message to handler (e.g., handleLobbyMessage)
                 }
 
             } catch (e: Exception) {
@@ -184,4 +184,19 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+    fun sendCalculateScoreRequest(gameId: String) {
+        val json = JSONObject().apply {
+            put("type", "calculate_score")
+            put("gameId", gameId)
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "Calculate score request sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send calculate score request: ${e.message}")
+            }
+        }
+    }
 }
