@@ -63,6 +63,12 @@ class GameViewModel : ViewModel() {
     private val _selectedMeeple = MutableStateFlow<Meeple?>(null)
     val selectedMeeple: StateFlow<Meeple?> = _selectedMeeple
 
+    private val _players = mutableStateListOf<Player>()
+    val players: List<Player> get() = _players
+
+    private val _currentPlayerId = mutableStateOf<String?>(null)
+    val currentPlayerId: State<String?> = _currentPlayerId
+
     private lateinit var webSocketClient: MyClient
 
     fun setWebSocketClient(client: MyClient) {
