@@ -831,7 +831,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
                         val pos = Position(x, y)
                         if (viewModel.isValidPlacement(pos)) {
-                                viewModel.placeTileAt(pos, gameId)
+                            viewModel.placeTileAt(pos, gameId)
                         } else {
                             Log.e("Game", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
                         }
@@ -980,7 +980,7 @@ fun PannableTileGrid(
     /* ----------------------------------------------------------
        Grund-Größen und States
        ---------------------------------------------------------- */
-    val tileSize   = 100.dp
+    val tileSize = 100.dp
     val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
     val context    = LocalContext.current
 
@@ -1128,6 +1128,9 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
     val tile = viewModel.currentTile.value //TODO: Mike oder doch collectAsState?
+    val currentPlayerId = viewModel.currentPlayerId.value
+    val players = viewModel.players
+    val currentPlayer = players.find { it.id == currentPlayerId }
     val remainingMeeples by viewModel.remainingMeeples.collectAsState()
     val isMeeplePlacementActive = viewModel.isMeeplePlacementActive.collectAsState()
     Log.d("MeeplePlacement", "UI State: ${isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
@@ -1206,7 +1209,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                             .padding(horizontal = 25.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "10P",
+                            text = "${currentPlayer?.score ?: 0}P",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black

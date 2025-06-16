@@ -59,6 +59,12 @@ class GameViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState
 
+    private val _players = mutableStateListOf<Player>()
+    val players: List<Player> get() = _players
+
+    private val _currentPlayerId = mutableStateOf<String?>(null)
+    val currentPlayerId: State<String?> = _currentPlayerId
+
     private val _selectedTile = MutableStateFlow<Tile?>(null)
     val selectedTile: StateFlow<Tile?> = _selectedTile
 
@@ -82,11 +88,6 @@ class GameViewModel : ViewModel() {
             this[playerId] = meepleCount
         }
     }
-
-    /*fun initializeTile() { //TODO Michael: nur Zwischenlösung bis TilePlacement da ist.
-        _currentTile.value = Tile("tile-a", "FIELD", "FIELD", "ROAD", "FIELD", hasMonastery = true)
-        Log.d("GameViewModel", "currentTile gesetzt: ${_currentTile.value}")
-    } */
 
     private lateinit var webSocketClient: MyClient
 
@@ -471,6 +472,7 @@ class GameViewModel : ViewModel() {
             _placedTiles.any { it.position == neighbor }
         }
     }
+
     fun placeMeeple(gameId: String, playerId: String, meepleId: String, tileId: String, position: String) {
         webSocketClient.sendPlaceMeeple(gameId, playerId, meepleId, tileId, position)
         Log.d("GameViewModel", "Meeple placement requested: $meepleId by player $playerId")
@@ -504,9 +506,34 @@ class GameViewModel : ViewModel() {
             Log.e("GameViewModel", "Cannot place meeple - Game state is not in Success")
         }
     }
+
+    fun setCurrentPlayerId(id: String) {
+        _currentPlayerId.value = id
+    }
+
+    fun handleScoreUpdateMessage(json: JSONObject) {
+        val scoreArray = json.getJSONArray("scores")
+        val updatedPlayers = mutableListOf<Player>()
+        for (i in 0 until scoreArray.length()) {
+            val obj = scoreArray.getJSONObject(i)
+            val player = Player(
+                id = obj.getString("id"),
+                name = "", //Dummy Werte bis zu Refactorn
+                color = Color.Black,   //TODO Refactoren
+                score = obj.getInt("score"),
+                availableMeeples = obj.optInt("remainingMeeple", 0),
+                // userId = if (obj.has("user_id")) obj.getInt("user_id") else null
+            )
+            updatedPlayers.add(player)
+        }
+
+        _players.clear()
+        _players.addAll(updatedPlayers)
+        Log.d("WebSocket", "Updated player scores: $_players")
+    }
 }
 
-    /**
+/**
  * UI State to handle frontend screen behavior
  */
 sealed class GameUiState {
