@@ -171,7 +171,11 @@ class GameViewModel : ViewModel() {
                         val tileWithPosition = placedTile.copy(position = position)
 
                         // Update the board state
-                        updateBoardWithTile(tileWithPosition, playerId)
+                        val phaseFromServer = json.optString("gamePhase", GamePhase.TILE_PLACEMENT.name)
+                        val gamePhase = GamePhase.valueOf(phaseFromServer)
+                        updateBoardWithTile(tileWithPosition, playerId, gamePhase)
+
+                        setMeeplePlacement(gamePhase == GamePhase.MEEPLE_PLACEMENT)
 
                         Log.d(
                             "WebSocket",
@@ -214,6 +218,24 @@ class GameViewModel : ViewModel() {
 
                         // Meeple-Anzahl aktualisieren
                         updateRemainingMeeples(playerId, remainingMeeple)
+
+                        val phaseStr   = json.optString(
+                            "gamePhase",
+                            GamePhase.TILE_PLACEMENT.name        // Fallback, falls Server (noch) nichts sendet
+                        )
+                        val newPhase   = GamePhase.valueOf(phaseStr)
+
+                        // Jetzt das Tile endgültig aus der BottomBar entfernen:
+                        clearCurrentTile()
+
+                        // Meeple-Modus aktivieren, wenn wir uns in der Phase MEEPLE_PLACEMENT befinden
+                        setMeeplePlacement(newPhase == GamePhase.MEEPLE_PLACEMENT)
+
+                        // Falls gewünschte Reaktion beim Scoring nötig:
+                        /*if (newPhase == GamePhase.SCORING) {
+                            // z. B. gleich Punkteberechnung anstoßen oder UI-Hinweis zeigen
+                            requestScoreUpdateIfNeeded()
+                        }*/ //TODO: MIKE@Felix, brauchst du sowas?
 
                         // Log.d("WebSocket", "Meeple gesetzt: ${meeple.id} an Position ($position.x, $position.y)")
                         Log.d("GameViewModel", "Meeple gesetzt: ${meeple.id}, verbleibende Meeples für $playerId: $remainingMeeple")
@@ -345,7 +367,7 @@ class GameViewModel : ViewModel() {
         Log.d("WebSocket", "Current tile cleared due to no playable tiles")
     }
 
-    private fun updateBoardWithTile(tile: Tile, playerId: String?) {
+    private fun updateBoardWithTile(tile: Tile, playerId: String?, phase: GamePhase) {
         val position = tile.position ?: return
         Log.d("GameViewModel", "updateBoardWithTile: placing ${tile.id} at $position")
 
@@ -361,7 +383,8 @@ class GameViewModel : ViewModel() {
         val updatedGameState = when (currentState) {
             is GameUiState.Success -> currentState.gameState.copy(
                 board = updatedBoard,
-                currentTile = null // Clear current tile after placement
+                currentTile = null, // Clear current tile after placement
+                gamePhase = phase
             )
             else -> GameState(
                 id = "unknown_game",
@@ -384,7 +407,7 @@ class GameViewModel : ViewModel() {
 
         // Clear selections
         _selectedTile.value = null
-        _currentTile.value = null
+        // _currentTile.value = null
 
         Log.d("GameViewModel", "Board now has ${updatedBoard.size} placed tiles")
     }
@@ -459,7 +482,9 @@ class GameViewModel : ViewModel() {
             playerId = json.getString("playerId"),
             tileId = json.getString("tileId"),
             position = MeeplePosition.valueOf(json.getString("position")),
-            type = MeepleType.valueOf(json.getString("type"))
+            x        = json.getInt("x"),
+            y        = json.getInt("y")
+            //type = MeepleType.valueOf(json.getString("type"))
         )
     }
 

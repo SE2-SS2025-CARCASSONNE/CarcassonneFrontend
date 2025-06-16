@@ -184,7 +184,7 @@ class MyClient(val callbacks: Callbacks) {
             put("meeple", JSONObject().apply {
                 put("id", meepleId)
                 put("playerId", playerId)
-                put("type", "MONK") // TODO MIKE: Falls der Meeple-Typ benötigt wird, derzeit fix auf Monk gesetzt!
+                // put("type", "MONK") // TODO MIKE: Sollte entfallen und rein im Backend gelöst werden.
                 put("tileId", tileId)
                 put("position", position)
             })

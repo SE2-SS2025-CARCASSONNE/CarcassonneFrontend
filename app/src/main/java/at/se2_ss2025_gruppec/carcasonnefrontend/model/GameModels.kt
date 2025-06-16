@@ -56,9 +56,11 @@ enum class MeeplePosition {
 data class Meeple(
     val id: String,
     val playerId: String,
-    val type: MeepleType,
+    // val type: MeepleType, ehemals, wird jetzt in Backend gelöst
     val tileId: String? = null,
-    val position: MeeplePosition? = null
+    val position: MeeplePosition? = null, //N, E, S, W oder C
+    val x: Int,                   // Board‐X
+    val y: Int                    // Board‐Y
 )
 
 data class GameState(
