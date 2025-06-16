@@ -56,6 +56,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.viewmodel.compose.viewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.gameApi
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.AuthViewModel
@@ -81,6 +82,9 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.topColor
 import kotlin.math.floor
 import androidx.core.graphics.createBitmap
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -776,8 +780,6 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
         navController.getBackStackEntry("lobby/$gameId")
     }
     val viewModel: GameViewModel = viewModel(backStackEntry)
-    val currentTile by viewModel.currentTile
-    var isMeeplePlacementActive by remember { mutableStateOf(false)}
 
     LaunchedEffect(gameId) {
         viewModel.setWebSocketClient(stompClient)
@@ -786,6 +788,18 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
         viewModel.subscribeToPrivate()
         viewModel.joinGame(gameId, playerName)
     }
+
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Phase-Flags (TILE-, MEEPLE- oder SCORING-Phase)
+    // uiState kann Loading / Error / Success sein → deshalb erst casten
+    val phase = (uiState as? GameUiState.Success)
+        ?.gameState
+        ?.gamePhase
+
+    val tileMode   = phase == GamePhase.TILE_PLACEMENT
+    val meepleMode = phase == GamePhase.MEEPLE_PLACEMENT
+    val scoring    = phase == GamePhase.SCORING
 
     Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
@@ -801,36 +815,59 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            val uiState by viewModel.uiState.collectAsState()
-
             if (uiState is GameUiState.Success) {
                 val gameState = (uiState as GameUiState.Success).gameState
                 val placedTiles = gameState.board.values.toList()
-
-                val meeples = remember { // Just for showcasing UI, delete later
-                    listOf(
-                        Meeple("123", "kdo3", MeepleType.MONK)
-                    )
-                }
+                val meeples     = gameState.meeples
+                val players = gameState.players
 
                 PannableTileGrid(
                     tiles = placedTiles,
                     meeples = meeples,
-                    onTileClick = { x, y ->
+                    players = players,
+                    tileMode = tileMode,
+                    meepleMode  = meepleMode,
+                    onTileClick = { x, y -> if (!tileMode) return@PannableTileGrid
+
                         val pos = Position(x, y)
                         if (viewModel.isValidPlacement(pos)) {
-                            viewModel.placeTileAt(pos, gameId)
+                                viewModel.placeTileAt(pos, gameId)
                         } else {
                             Log.e("Game", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
                         }
                     },
 
+                    // Meeple platzieren
                     onMeepleClick = { x, y, zone ->
+                        if (!meepleMode) return@PannableTileGrid // wir sind nicht im Meeple-Modus
                         Log.d("GameplayScreen", "MeepleClick ausgelöst: x=$x, y=$y, zone=$zone") // Debug-Log für zone!
 
-                        currentTile?.let { tile ->
+                        // Tile unter (x,y) im Board suchen
+                        val clickedPos  = Position(x, y)
+                        val targetTile = gameState.board[clickedPos] ?: run {
+                            Log.e("GameplayScreen", "No tile at $clickedPos → kein Meeple möglich")
+                            return@PannableTileGrid
+                        }
+
+                        // Einmalige Meeple-ID erzeugen
+                        val meepleId = UUID.randomUUID().toString()
+                        val playerId = TokenManager.loggedInUsername ?: "unknown"
+
+                        Log.d("GameplayScreen",
+                            "Meeple wird platziert → game=$gameId, player=$playerId, " +
+                                    "tile=${targetTile.id}, zone=${zone.name}")
+
+                        viewModel.placeMeeple(
+                            gameId  = gameId,
+                            playerId= playerId,
+                            meepleId= meepleId,
+                            tileId  = targetTile.id,
+                            position= zone.name
+                        )
+
+                        /* currentTile?.let { tile ->
                             val playerId = TokenManager.loggedInUsername ?: "unknown"
-                            val meepleId = "test_meeple_123" //TODO Michael: durch echte MeepleId ersetzen
+                            //val meepleId = "test_meeple_123"
 
                             if (zone != null) { // Stelle sicher, dass zone nicht null ist
                                 Log.d("GameplayScreen", "Meeple wird platziert mit gameId=$gameId, playerId=$playerId, tileId=${tile.id}, position=${zone.name}") // Debug-Log für placeMeeple
@@ -838,7 +875,8 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                             } else {
                                 Log.e("GameplayScreen", "Ungültige Meeple-Zone erkannt – keine Platzierung!")
                             }
-                        } ?: Log.e("GameplayScreen", "Kein aktueller Tile vorhanden!")
+                        } ?: Log.e("GameplayScreen", "Kein aktueller Tile vorhanden!") */
+
                     },
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 )
@@ -930,89 +968,148 @@ fun TileBackButton(
 @SuppressLint("DiscouragedApi")
 @Composable
 fun PannableTileGrid(
-    tiles: List<Tile>,
-    meeples: List<Meeple>,
-    onTileClick: (Int, Int) -> Unit,
+    tiles:       List<Tile>,
+    meeples:     List<Meeple>,
+    players:     List<Player>,
+    tileMode:    Boolean,
+    meepleMode:  Boolean,
+    onTileClick:   (Int, Int) -> Unit,
     onMeepleClick: (Int, Int, MeeplePosition) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tileSize = 100.dp
+    /* ----------------------------------------------------------
+       Grund-Größen und States
+       ---------------------------------------------------------- */
+    val tileSize   = 100.dp
     val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
-    val context = LocalContext.current
+    val context    = LocalContext.current
 
-    val scale = remember { mutableFloatStateOf(1f) }
+    val scale   = remember { mutableFloatStateOf(1f) }
     val offsetX = remember { mutableFloatStateOf(0f) }
     val offsetY = remember { mutableFloatStateOf(0f) }
-    val imageCache = remember { mutableMapOf<Int, ImageBitmap>() }
+    val imageCache = remember { mutableMapOf<String, ImageBitmap>() }
 
+    /* ----------------------------------------------------------
+       Gesten-Handling
+       ---------------------------------------------------------- */
     val gestureModifier = Modifier
+        /* ❶ Pan & Zoom – immer aktiv */
         .pointerInput(Unit) {
             detectTransformGestures { _, pan, zoom, _ ->
-                scale.value *= zoom
+                scale.value   *= zoom
                 offsetX.value += pan.x
                 offsetY.value += pan.y
             }
         }
-        .pointerInput(Unit) {
+        /* ❷ Tap-Handling – hängt vom Modus ab */
+        .pointerInput(tileMode, meepleMode) {
             detectTapGestures { offset ->
-                val scaledTileSizePx = tileSizePx * scale.value
-                val x = floor((offset.x - offsetX.value) / scaledTileSizePx).toInt()
-                val y = floor((offset.y - offsetY.value) / scaledTileSizePx).toInt()
-                onTileClick(x, y)
+                val scaled = tileSizePx * scale.value
+                val x = floor((offset.x - offsetX.value) / scaled).toInt()
+                val y = floor((offset.y - offsetY.value) / scaled).toInt()
 
-                val tileStartX = x * scaledTileSizePx + offsetX.floatValue
-                val tileStartY = y * scaledTileSizePx + offsetY.floatValue
-                val localX = offset.x - tileStartX
-                val localY = offset.y - tileStartY
+                /* ---------- TILE ---------- */
+                if (tileMode) onTileClick(x, y)
 
-                val segment = scaledTileSizePx / 3f
-                val zone = when {
-                    localX < segment && localY in segment..(2 * segment) -> MeeplePosition.W
-                    localX > 2 * segment && localY in segment..(2 * segment) -> MeeplePosition.E
-                    localY < segment && localX in segment..(2 * segment) -> MeeplePosition.N
-                    localY > 2 * segment && localX in segment..(2 * segment) -> MeeplePosition.S
-                    localX in segment..(2 * segment) && localY in segment..(2 * segment) -> MeeplePosition.C
-                    else -> null
-                }
+                /* ---------- MEEPLE ---------- */
+                if (meepleMode) {
+                    val seg = scaled / 3f
+                    val localX = offset.x - (x * scaled + offsetX.value)
+                    val localY = offset.y - (y * scaled + offsetY.value)
 
-                zone?.let {
-                    println("Tapped tile ($x, $y) at zone: $it")
-                    onMeepleClick(x, y, it)
+                    val zone = when {
+                        localX <  seg         && localY in  seg..2*seg -> MeeplePosition.W
+                        localX >  2*seg       && localY in  seg..2*seg -> MeeplePosition.E
+                        localY <  seg         && localX in  seg..2*seg -> MeeplePosition.N
+                        localY >  2*seg       && localX in  seg..2*seg -> MeeplePosition.S
+                        localX in seg..2*seg  && localY in seg..2*seg -> MeeplePosition.C
+                        else -> null
+                    }
+                    zone?.let { onMeepleClick(x, y, it) }
                 }
             }
         }
 
+    /* ----------------------------------------------------------
+       Zeichnen
+       ---------------------------------------------------------- */
     Box(
         modifier = modifier
             .clipToBounds()
             .then(gestureModifier)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val scaledTileSizePx = (tileSizePx * scale.value).coerceAtLeast(1f)
+            val scaledSize = (tileSizePx * scale.value).coerceAtLeast(1f)
+            val seg        = scaledSize / 3f
 
+            /* ---------- 1) Tiles ---------- */
             tiles.forEach { tile ->
-                val pos = tile.position ?: return@forEach
-                val left = pos.x * scaledTileSizePx + offsetX.value
-                val top  = pos.y * scaledTileSizePx + offsetY.value
+                val pos  = tile.position ?: return@forEach
+                val left = pos.x * scaledSize + offsetX.value
+                val top  = pos.y * scaledSize + offsetY.value
 
-                val baseName = tile.id.substringBeforeLast("-").replace("-", "_")
+                val baseName  = tile.id.substringBeforeLast("-").replace("-", "_")
                 val derivedId = context.resources.getIdentifier(baseName, "drawable", context.packageName)
-
-                val resId = tile.drawableRes?.takeIf { it != 0 } ?: derivedId
+                val resId     = tile.drawableRes?.takeIf { it != 0 } ?: derivedId   // <- Safe-Call wieder drin
                 if (resId == 0) return@forEach
 
-                val image = imageCache.getOrPut(resId) {
-                    val drawable = ContextCompat.getDrawable(context, resId)!!
-                    val bitmap = drawableToBitmap(drawable, scaledTileSizePx.toInt(), scaledTileSizePx.toInt())
-                    bitmap.asImageBitmap()
+                val img = imageCache.getOrPut(baseName) {
+                    val dr  = ContextCompat.getDrawable(context, resId)!!
+                    val bmp = drawableToBitmap(dr, scaledSize.toInt(), scaledSize.toInt())
+                    bmp.asImageBitmap()
                 }
 
                 withTransform({
                     translate(left, top)
-                    rotate(tile.tileRotation.degrees.toFloat(), pivot = Offset(scaledTileSizePx/2, scaledTileSizePx/2))
+                    rotate(tile.tileRotation.degrees.toFloat(), pivot = Offset(scaledSize/2, scaledSize/2))
                 }) {
-                    drawImage(image, dstSize = IntSize(scaledTileSizePx.toInt(), scaledTileSizePx.toInt()))
+                    drawImage(img, dstSize = IntSize(scaledSize.toInt(), scaledSize.toInt()))
                 }
+            }
+
+            /* ---------- 2) Meeples ---------- */
+            meeples.forEach { meeple ->
+                val px = meeple.x * scaledSize + offsetX.value
+                val py = meeple.y * scaledSize + offsetY.value
+
+                val (cx, cy) = when (meeple.position) {
+                    MeeplePosition.W -> seg*0.5f to seg*1.5f
+                    MeeplePosition.E -> seg*2.5f to seg*1.5f
+                    MeeplePosition.N -> seg*1.5f to seg*0.5f
+                    MeeplePosition.S -> seg*1.5f to seg*2.5f
+                    MeeplePosition.C -> seg*1.5f to seg*1.5f
+                    null -> return@forEach
+                }
+
+                val idx = players.indexOfFirst { it.id == meeple.playerId }
+                    .let { if (it >= 0) it.coerceIn(0..3) else 0 }
+
+                val drawableName = when (idx) {
+                    0 -> "meeple_blu"
+                    1 -> "meeple_grn"
+                    2 -> "meeple_red"
+                    else -> "meeple_yel"
+                }
+
+                val rid = context.resources.getIdentifier(drawableName, "drawable", context.packageName)
+                if (rid == 0) return@forEach
+                val dr = ContextCompat.getDrawable(context, rid) ?: return@forEach
+
+                val dstPx    = (scaledSize * 0.3f).toInt()         // 30 % der Kachel
+                val cacheKey = "${drawableName}_$dstPx"
+
+                val bmp = imageCache.getOrPut(cacheKey) {
+                    drawableToBitmap(dr, dstPx, dstPx).asImageBitmap()
+                }
+
+                drawImage(
+                    image     = bmp,
+                    dstOffset = IntOffset(
+                        ((px + cx) - dstPx / 2).toInt(),
+                        ((py + cy) - dstPx / 2).toInt()
+                    ),
+                    dstSize   = IntSize(dstPx, dstPx)
+                )
             }
         }
     }
