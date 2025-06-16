@@ -16,10 +16,13 @@ import org.hildan.krossbow.stomp.sendText
 import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import org.json.JSONObject
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.MeepleDto
+
 
 class MyClient(val callbacks: Callbacks) {
 
     private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
+    //private val WEBSOCKET_URI = "ws://192.168.8.54:8080/ws/game"
 
     private lateinit var topicFlow: Flow<String>
     private lateinit var collector: Job
@@ -172,6 +175,30 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+
+    fun sendPlaceMeeple(gameId: String, playerId: String, meepleId: String, tileId: String, position: String) {
+        val json = JSONObject().apply {
+            put("type", "place_meeple")
+            put("gameId", gameId)
+            put("player", playerId)
+            put("meeple", JSONObject().apply {
+                put("id", meepleId)
+                put("playerId", playerId)
+                // put("type", "MONK") // TODO MIKE: Sollte entfallen und rein im Backend gelöst werden.
+                put("tileId", tileId)
+                put("position", position)
+            })
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "Meeple placement message sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send meeple placement: ${e.message}")
+            }
+        }
+    }
     fun sendPlaceTileRequest(payload: String){
         scope.launch {
             try {
