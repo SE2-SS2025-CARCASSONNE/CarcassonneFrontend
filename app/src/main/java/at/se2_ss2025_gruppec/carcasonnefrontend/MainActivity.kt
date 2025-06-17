@@ -68,10 +68,8 @@ import org.json.JSONObject
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
-import androidx.core.graphics.drawable.toBitmap
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
-import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeepleType
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
@@ -105,7 +103,6 @@ class MainActivity : ComponentActivity() {
                         }).apply { connect() }
                     })
                 }
-
 
                 NavHost(navController = navController, startDestination = "landing") {
                     composable("landing") { LandingScreen(onStartTapped = {
@@ -394,14 +391,6 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                         }
                     }
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                PixelArtButton( //Just for development
-                    label = "Skip (for devs)",
-                    onClick = {
-                        onAuthSuccess("mock-jwt")
-                    }
-                )
             }
         }
     }
@@ -635,7 +624,6 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
         while (!stompClient.isConnected()) {
             delay(100)
         }
-
         //Subscribe to both public and private channels
         stompClient.listenOn("/topic/game/$gameId") { handleLobbyMessage(it) }
         stompClient.listenOn("/user/queue/private") { handleLobbyMessage(it) }

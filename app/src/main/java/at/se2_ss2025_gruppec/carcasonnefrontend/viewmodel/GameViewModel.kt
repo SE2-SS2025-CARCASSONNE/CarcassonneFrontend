@@ -9,7 +9,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
-import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeepleType
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
@@ -17,11 +16,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
-
-fun getDrawableNameForTile(tile: Tile): String {
-    val baseId = tile.id.substringBefore("-")
-    return baseId.replace("-", "_")
-}
 
 fun Tile.topColor(): Color = directionToColor(this.top)
 fun Tile.rightColor(): Color = directionToColor(this.right)
@@ -64,12 +58,6 @@ class GameViewModel : ViewModel() {
 
     private val _currentPlayerId = mutableStateOf<String?>(null)
     val currentPlayerId: State<String?> = _currentPlayerId
-
-    private val _selectedTile = MutableStateFlow<Tile?>(null)
-    val selectedTile: StateFlow<Tile?> = _selectedTile
-
-    private val _selectedMeeple = MutableStateFlow<Meeple?>(null)
-    val selectedMeeple: StateFlow<Meeple?> = _selectedMeeple
 
     private val _isMeeplePlacementActive = MutableStateFlow(false)
     val isMeeplePlacementActive: StateFlow<Boolean> get() = _isMeeplePlacementActive
@@ -405,10 +393,6 @@ class GameViewModel : ViewModel() {
         // Sync placed tiles with updated board
         _placedTiles.clear()
         _placedTiles.addAll(updatedBoard.values)
-
-        // Clear selections
-        _selectedTile.value = null
-        // _currentTile.value = null
 
         Log.d("GameViewModel", "Board now has ${updatedBoard.size} placed tiles")
     }
