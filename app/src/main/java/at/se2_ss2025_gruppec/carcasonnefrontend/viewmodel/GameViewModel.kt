@@ -50,6 +50,9 @@ class GameViewModel : ViewModel() {
     private val _validPlacements = MutableStateFlow<List<Pair<Position,TileRotation>>>(emptyList())
     val validPlacements: StateFlow<List<Pair<Position,TileRotation>>> = _validPlacements
 
+    private val _deckRemaining = MutableStateFlow(0)
+    val deckRemaining: StateFlow<Int> = _deckRemaining
+
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState
 
@@ -135,6 +138,10 @@ class GameViewModel : ViewModel() {
                         }
                         _validPlacements.value = validPlacementList
                     }
+                }
+
+                "deck_update" -> {
+                    _deckRemaining.value = json.getInt("deckRemaining")
                 }
 
                 "board_update" -> {
@@ -228,15 +235,8 @@ class GameViewModel : ViewModel() {
                         // Meeple-Modus aktivieren, wenn wir uns in der Phase MEEPLE_PLACEMENT befinden
                         setMeeplePlacement(newPhase == GamePhase.MEEPLE_PLACEMENT)
 
-                        // Falls gewünschte Reaktion beim Scoring nötig:
-                        /*if (newPhase == GamePhase.SCORING) {
-                            // z. B. gleich Punkteberechnung anstoßen oder UI-Hinweis zeigen
-                            requestScoreUpdateIfNeeded()
-                        }*/ //TODO: MIKE@Felix, brauchst du sowas?
-
                         // Log.d("WebSocket", "Meeple gesetzt: ${meeple.id} an Position ($position.x, $position.y)")
                         Log.d("GameViewModel", "Meeple gesetzt: ${meeple.id}, verbleibende Meeples für $playerId: $remainingMeeple")
-
 
                     } catch (e: Exception) {
                         Log.e("WebSocket", "Fehler beim Verarbeiten von meeple_placed: ${e.message}")
