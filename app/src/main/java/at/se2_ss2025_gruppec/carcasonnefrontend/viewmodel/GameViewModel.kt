@@ -462,6 +462,11 @@ class GameViewModel : ViewModel() {
         Log.d("GameViewModel", "Meeple placement requested: $meepleId by player $playerId")
     }
 
+    fun skipMeeple(gameId: String) {
+        _isMeeplePlacementActive.value = false
+        joinedPlayerName?.let { webSocketClient.sendSkipMeeple(gameId, it) }
+    }
+
     private fun parseMeepleFromJson(json: JSONObject): Meeple {
         return Meeple(
             id = json.getString("id"),

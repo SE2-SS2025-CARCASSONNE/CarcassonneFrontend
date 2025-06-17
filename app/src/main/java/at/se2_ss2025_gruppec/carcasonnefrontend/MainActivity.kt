@@ -391,6 +391,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                         }
                     }
                 )
+                Spacer(modifier = Modifier.height(100.dp))
             }
         }
     }
@@ -1181,7 +1182,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                         modifier = Modifier
                             .size(65.dp)
                             .clickable {
-                                viewModel.setMeeplePlacement(false)
+                                viewModel.skipMeeple(gameId)
                                 viewModel.requestScoreUpdate(gameId) // Punkteberechnung starten
                             }
                     )

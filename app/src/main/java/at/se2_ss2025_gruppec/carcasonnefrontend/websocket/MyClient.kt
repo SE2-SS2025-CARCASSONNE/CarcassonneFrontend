@@ -175,6 +175,17 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+    fun sendPlaceTileRequest(payload: String){
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", payload)
+                Log.d("WebSocket", "Tile placement request sent: $payload")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send tile placement request: ${e.message}")
+
+            }
+        }
+    }
 
     fun sendPlaceMeeple(gameId: String, playerId: String, meepleId: String, tileId: String, position: String) {
         val json = JSONObject().apply {
@@ -184,7 +195,6 @@ class MyClient(val callbacks: Callbacks) {
             put("meeple", JSONObject().apply {
                 put("id", meepleId)
                 put("playerId", playerId)
-                // put("type", "MONK") // TODO MIKE: Sollte entfallen und rein im Backend gelöst werden.
                 put("tileId", tileId)
                 put("position", position)
             })
@@ -199,15 +209,16 @@ class MyClient(val callbacks: Callbacks) {
             }
         }
     }
-    fun sendPlaceTileRequest(payload: String){
-        scope.launch {
-            try {
-                session?.sendText("/app/game/send", payload)
-                Log.d("WebSocket", "Tile placement request sent: $payload")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send tile placement request: ${e.message}")
 
-            }
+    fun sendSkipMeeple(gameId: String, playerId: String) {
+        val json = JSONObject().apply {
+            put("type",     "skip_meeple")
+            put("gameId",   gameId)
+            put("player",   playerId)
+        }
+        scope.launch {
+            session?.sendText("/app/game/send", json.toString())
+            Log.d("WebSocket", "Skip meeple sent: $json")
         }
     }
 
