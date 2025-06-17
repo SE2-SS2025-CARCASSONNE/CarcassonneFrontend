@@ -800,7 +800,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            TileBackRow(viewModel, gameId)
+            TileBackRow(viewModel, gameId, playerName)
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -901,26 +901,25 @@ fun PlayerRow() {
 }
 
 @Composable
-fun TileBackRow(viewModel: GameViewModel, gameId: String) {
-    val counters = remember { listOf(mutableIntStateOf(18), mutableIntStateOf(18), mutableIntStateOf(18), mutableIntStateOf(17)) }
+fun TileBackRow(viewModel: GameViewModel, gameId: String, playerId: String) {
+    val deckRemaining by viewModel.deckRemaining.collectAsState(initial = 71)
+
+    val base = deckRemaining / 4
+    val extra = deckRemaining % 4
+    val piles = List(4) { index ->
+        base + if (index < extra) 1 else 0
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        repeat(4) { index ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                TileBackButton(
-                    remaining = counters[index].intValue,
-                    onClick = {
-                        if (counters[index].intValue > 0) {
-                            counters[index].intValue -= 1
-                            viewModel.requestTileFromBackend(gameId, "HOST")
-                        }
-                    },
-                    isEnabled = counters[index].intValue > 0
-                )
-            }
+        piles.forEachIndexed { index, remaining ->
+            TileBackButton(
+                remaining = remaining,
+                isEnabled = remaining > 0,
+                onClick = { viewModel.requestTileFromBackend(gameId, playerId) }
+            )
         }
     }
 }
