@@ -1183,7 +1183,6 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                             .size(65.dp)
                             .clickable {
                                 viewModel.skipMeeple(gameId)
-                                viewModel.requestScoreUpdate(gameId) // Punkteberechnung starten
                             }
                     )
 

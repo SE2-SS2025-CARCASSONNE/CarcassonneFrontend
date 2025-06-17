@@ -177,6 +177,14 @@ class GameViewModel : ViewModel() {
                     }
                 }
 
+                "score_update" -> {
+                    updateGameWithScore(json)
+                    _isMeeplePlacementActive.value = false
+                    _currentTile.value = null
+                    _validPlacements.value = emptyList()
+                    _currentPlayerId.value = json.getString("nextPlayer")
+                }
+
                 "error" -> {
                     val message = json.getString("message")
                     Log.e("WebSocket", "Error from server: $message")
@@ -243,10 +251,6 @@ class GameViewModel : ViewModel() {
         } catch (e: Exception) {
             Log.e("WebSocket", "Failed to parse WebSocket message: ${e.message}")
         }
-    }
-
-    fun requestScoreUpdate(gameId: String) {  // TODO: Felix bzw. Reviewer: Bei Merge durch Felix-Methode ersetzen!
-        Log.d("GameViewModel", "Dummy: Score update requested for gameId: $gameId")
     }
 
     fun onTileDrawn(tile: Tile) {
@@ -500,25 +504,26 @@ class GameViewModel : ViewModel() {
         _currentPlayerId.value = id
     }
 
-    fun handleScoreUpdateMessage(json: JSONObject) {
-        val scoreArray = json.getJSONArray("scores")
-        val updatedPlayers = mutableListOf<Player>()
-        for (i in 0 until scoreArray.length()) {
-            val obj = scoreArray.getJSONObject(i)
-            val player = Player(
-                id = obj.getString("id"),
-                name = "", //Dummy Werte bis zu Refactorn
-                color = Color.Black,   //TODO Refactoren
-                score = obj.getInt("score"),
-                availableMeeples = obj.optInt("remainingMeeple", 0),
-                // userId = if (obj.has("user_id")) obj.getInt("user_id") else null
-            )
-            updatedPlayers.add(player)
+    fun updateGameWithScore(json: JSONObject) {
+        // Get array of player scores and build map by player ID
+        val arr = json.getJSONArray("scores")
+        val byId = (0 until arr.length()).associate { i ->
+            val o = arr.getJSONObject(i)
+            o.getString("player") to o
         }
 
-        _players.clear()
-        _players.addAll(updatedPlayers)
-        Log.d("WebSocket", "Updated player scores: $_players")
+        // Update score and remainingMeeple fields on Player list
+        _players.replaceAll { existing ->
+            byId[existing.id]?.let { payload ->
+                existing.copy(
+                    score = payload.getInt("score"),
+                    availableMeeples = payload.optInt("remainingMeeple", existing.availableMeeples)
+                )
+            } ?: existing
+        }
+
+        // Advance the UI to new current player
+        setCurrentPlayerId(json.optString("nextPlayer"))
     }
 }
 

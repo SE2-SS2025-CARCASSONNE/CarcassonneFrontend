@@ -22,13 +22,7 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.MeepleDto
 class MyClient(val callbacks: Callbacks) {
 
     private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
-    //private val WEBSOCKET_URI = "ws://192.168.8.54:8080/ws/game"
-
-    private lateinit var topicFlow: Flow<String>
-    private lateinit var collector: Job
-
-    private lateinit var jsonFlow: Flow<String>
-    private lateinit var jsonCollector: Job
+    //private val WEBSOCKET_URI = "ws://192.168.0.255:8080/ws/game"
 
     private lateinit var client: StompClient
     private var session: StompSession? = null
@@ -71,34 +65,6 @@ class MyClient(val callbacks: Callbacks) {
             } catch (e: Exception) {
                 Log.e("WebSocket", "WebSocket connection failed: ${e.message}")
                 callback("Login failed: ${e.message}")
-            }
-        }
-    }
-
-    fun sendHello() {
-        scope.launch {
-            try {
-                session?.sendText("/app/hello", "message from client")
-                Log.d("WebSocket", "Message sent: Hello")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send hello: ${e.message}")
-            }
-        }
-    }
-
-    fun sendJson() {
-        val json = JSONObject().apply {
-            put("from", "client")
-            put("text", "from client")
-        }
-        val message = json.toString()
-
-        scope.launch {
-            try {
-                session?.sendText("/app/object", message)
-                Log.d("WebSocket", "JSON message sent: $message")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send JSON: ${e.message}")
             }
         }
     }
@@ -219,22 +185,6 @@ class MyClient(val callbacks: Callbacks) {
         scope.launch {
             session?.sendText("/app/game/send", json.toString())
             Log.d("WebSocket", "Skip meeple sent: $json")
-        }
-    }
-
-    fun sendCalculateScoreRequest(gameId: String) {
-        val json = JSONObject().apply {
-            put("type", "calculate_score")
-            put("gameId", gameId)
-        }
-
-        scope.launch {
-            try {
-                session?.sendText("/app/game/send", json.toString())
-                Log.d("WebSocket", "Calculate score request sent: $json")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send calculate score request: ${e.message}")
-            }
         }
     }
 }
