@@ -796,7 +796,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(40.dp))
 
-            PlayerRow()
+            PlayerRow(viewModel)
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -822,7 +822,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                         if (viewModel.isValidPlacement(pos)) {
                             viewModel.placeTileAt(pos, gameId)
                         } else {
-                            Log.e("Game", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
+                            Log.e("Frontend Guard", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
                         }
                     },
 
@@ -853,19 +853,6 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                             tileId  = targetTile.id,
                             position= zone.name
                         )
-
-                        /* currentTile?.let { tile ->
-                            val playerId = TokenManager.loggedInUsername ?: "unknown"
-                            //val meepleId = "test_meeple_123"
-
-                            if (zone != null) { // Stelle sicher, dass zone nicht null ist
-                                Log.d("GameplayScreen", "Meeple wird platziert mit gameId=$gameId, playerId=$playerId, tileId=${tile.id}, position=${zone.name}") // Debug-Log für placeMeeple
-                                viewModel.placeMeeple(gameId, playerId, meepleId, tile.id, zone.name)
-                            } else {
-                                Log.e("GameplayScreen", "Ungültige Meeple-Zone erkannt – keine Platzierung!")
-                            }
-                        } ?: Log.e("GameplayScreen", "Kein aktueller Tile vorhanden!") */
-
                     },
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 )
@@ -880,21 +867,37 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 }
 
 @Composable
-fun PlayerRow() {
+fun PlayerRow(viewModel: GameViewModel) {
+    val players = viewModel.players
+    val currentPlayerId by viewModel.currentPlayerId
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
+        players.forEach { p ->
+            val isCurrent = p.id == currentPlayerId
+            val tint = if (isCurrent) Color.Green else Color.White
+
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     imageVector = Icons.Default.Person,
-                    contentDescription = "Player",
-                    tint = if (index == 0) Color.Green else Color.White,
+                    contentDescription = "Player ${p.id}",
+                    tint = tint,
                     modifier = Modifier.size(30.dp)
                 )
-                Text(name, fontSize = 12.sp,
-                    color = if (index == 0) Color.Green else Color.White)
+                Text(text = p.id,
+                    color = tint,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "${p.score}P",
+                        color = Color.LightGray,
+                    fontSize = 11.sp
+                )
+
             }
         }
     }

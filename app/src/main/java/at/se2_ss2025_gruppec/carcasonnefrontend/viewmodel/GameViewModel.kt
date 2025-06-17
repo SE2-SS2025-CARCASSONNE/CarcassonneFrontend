@@ -33,10 +33,7 @@ fun directionToColor(type: String): Color = when (type) {
 class GameViewModel : ViewModel() {
 
     private var joinedPlayerName: String? = null
-
-    fun setJoinedPlayer(name: String) {
-        joinedPlayerName = name
-    }
+    fun setJoinedPlayer(name: String) { joinedPlayerName = name }
 
     private val _tileDeck = mutableStateListOf<Tile>()
     val tileDeck: List<Tile> = _tileDeck
@@ -117,8 +114,19 @@ class GameViewModel : ViewModel() {
 
             when (type) {
                 "player_joined" -> {
-                    val currentPlayer = json.getString("currentPlayer")
-                    setJoinedPlayer(currentPlayer)
+                    val arr = json.getJSONArray("players")
+                    val newPlayers = (0 until arr.length()).map { i ->
+                        Player(
+                            id = arr.getString(i),
+                            name = arr.getString(i),
+                            score = 0,
+                            availableMeeples = 7,
+                            color = Color.Green
+                        )
+                    }
+                    _players.clear()
+                    _players.addAll(newPlayers)
+                    _currentPlayerId.value = json.getString("currentPlayer")
                 }
 
                 "TILE_DRAWN" -> {
@@ -397,6 +405,10 @@ class GameViewModel : ViewModel() {
         // Sync placed tiles with updated board
         _placedTiles.clear()
         _placedTiles.addAll(updatedBoard.values)
+
+        // Clear drawn tile and valid placements
+        _currentTile.value  = null
+        _validPlacements.value = emptyList()
 
         Log.d("GameViewModel", "Board now has ${updatedBoard.size} placed tiles")
     }
