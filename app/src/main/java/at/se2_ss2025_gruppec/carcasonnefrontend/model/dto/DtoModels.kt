@@ -55,7 +55,7 @@ data class TileDto(
 data class MeepleDto(
     val id: String,
     val playerId: String,
-    val type: String,
+    // val type: String, ehemals für MeepleType
     val tileId: String?,
     val position: String?
 )

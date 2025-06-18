@@ -46,19 +46,21 @@ enum class MeepleType {
 }
 
 enum class MeeplePosition {
-    NORTH,
-    EAST,
-    SOUTH,
-    WEST,
-    CENTER
+    N, // North
+    E, // East
+    S, // South
+    W, // West
+    C  // Center (Monastery)
 }
 
 data class Meeple(
     val id: String,
     val playerId: String,
-    val type: MeepleType,
+    // val type: MeepleType, ehemals, wird jetzt in Backend gelöst
     val tileId: String? = null,
-    val position: MeeplePosition? = null
+    val position: MeeplePosition? = null, //N, E, S, W oder C
+    val x: Int,                   // Board‐X
+    val y: Int                    // Board‐Y
 )
 
 data class GameState(
