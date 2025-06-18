@@ -9,7 +9,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
-import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeepleType
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
@@ -17,11 +16,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
-
-fun getDrawableNameForTile(tile: Tile): String {
-    val baseId = tile.id.substringBefore("-")
-    return baseId.replace("-", "_")
-}
 
 fun Tile.topColor(): Color = directionToColor(this.top)
 fun Tile.rightColor(): Color = directionToColor(this.right)
@@ -39,10 +33,7 @@ fun directionToColor(type: String): Color = when (type) {
 class GameViewModel : ViewModel() {
 
     private var joinedPlayerName: String? = null
-
-    fun setJoinedPlayer(name: String) {
-        joinedPlayerName = name
-    }
+    fun setJoinedPlayer(name: String) { joinedPlayerName = name }
 
     private val _tileDeck = mutableStateListOf<Tile>()
     val tileDeck: List<Tile> = _tileDeck
@@ -56,6 +47,9 @@ class GameViewModel : ViewModel() {
     private val _validPlacements = MutableStateFlow<List<Pair<Position,TileRotation>>>(emptyList())
     val validPlacements: StateFlow<List<Pair<Position,TileRotation>>> = _validPlacements
 
+    private val _deckRemaining = MutableStateFlow(0)
+    val deckRemaining: StateFlow<Int> = _deckRemaining
+
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState
 
@@ -64,12 +58,6 @@ class GameViewModel : ViewModel() {
 
     private val _currentPlayerId = mutableStateOf<String?>(null)
     val currentPlayerId: State<String?> = _currentPlayerId
-
-    private val _selectedTile = MutableStateFlow<Tile?>(null)
-    val selectedTile: StateFlow<Tile?> = _selectedTile
-
-    private val _selectedMeeple = MutableStateFlow<Meeple?>(null)
-    val selectedMeeple: StateFlow<Meeple?> = _selectedMeeple
 
     private val _isMeeplePlacementActive = MutableStateFlow(false)
     val isMeeplePlacementActive: StateFlow<Boolean> get() = _isMeeplePlacementActive
@@ -126,8 +114,19 @@ class GameViewModel : ViewModel() {
 
             when (type) {
                 "player_joined" -> {
-                    val currentPlayer = json.getString("currentPlayer")
-                    setJoinedPlayer(currentPlayer)
+                    val arr = json.getJSONArray("players")
+                    val newPlayers = (0 until arr.length()).map { i ->
+                        Player(
+                            id = arr.getString(i),
+                            name = arr.getString(i),
+                            score = 0,
+                            availableMeeples = 7,
+                            color = Color.Green
+                        )
+                    }
+                    _players.clear()
+                    _players.addAll(newPlayers)
+                    _currentPlayerId.value = json.getString("currentPlayer")
                 }
 
                 "TILE_DRAWN" -> {
@@ -147,6 +146,10 @@ class GameViewModel : ViewModel() {
                         }
                         _validPlacements.value = validPlacementList
                     }
+                }
+
+                "deck_update" -> {
+                    _deckRemaining.value = json.getInt("deckRemaining")
                 }
 
                 "board_update" -> {
@@ -187,6 +190,23 @@ class GameViewModel : ViewModel() {
                         Log.e("WebSocket", "Failed to process board_update: ${e.message}")
                         _uiState.value = GameUiState.Error("Failed to update board: ${e.message}")
                     }
+                }
+
+                "score_update" -> {
+                    updateGameWithScore(json)
+
+                    val phaseStr = json.optString("gamePhase", GamePhase.TILE_PLACEMENT.name)
+                    val newPhase = GamePhase.valueOf(phaseStr)
+                    val current = _uiState.value
+                    if (current is GameUiState.Success) {
+                        _uiState.value = GameUiState.Success(
+                            current.gameState.copy(gamePhase = newPhase)
+                        )
+                    }
+                    _isMeeplePlacementActive.value = false
+                    _currentTile.value = null
+                    _validPlacements.value = emptyList()
+                    _currentPlayerId.value = json.getString("nextPlayer")
                 }
 
                 "error" -> {
@@ -232,15 +252,8 @@ class GameViewModel : ViewModel() {
                         // Meeple-Modus aktivieren, wenn wir uns in der Phase MEEPLE_PLACEMENT befinden
                         setMeeplePlacement(newPhase == GamePhase.MEEPLE_PLACEMENT)
 
-                        // Falls gewünschte Reaktion beim Scoring nötig:
-                        /*if (newPhase == GamePhase.SCORING) {
-                            // z. B. gleich Punkteberechnung anstoßen oder UI-Hinweis zeigen
-                            requestScoreUpdateIfNeeded()
-                        }*/ //TODO: MIKE@Felix, brauchst du sowas?
-
                         // Log.d("WebSocket", "Meeple gesetzt: ${meeple.id} an Position ($position.x, $position.y)")
                         Log.d("GameViewModel", "Meeple gesetzt: ${meeple.id}, verbleibende Meeples für $playerId: $remainingMeeple")
-
 
                     } catch (e: Exception) {
                         Log.e("WebSocket", "Fehler beim Verarbeiten von meeple_placed: ${e.message}")
@@ -255,10 +268,6 @@ class GameViewModel : ViewModel() {
         } catch (e: Exception) {
             Log.e("WebSocket", "Failed to parse WebSocket message: ${e.message}")
         }
-    }
-
-    fun requestScoreUpdate(gameId: String) {  // TODO: Felix bzw. Reviewer: Bei Merge durch Felix-Methode ersetzen!
-        Log.d("GameViewModel", "Dummy: Score update requested for gameId: $gameId")
     }
 
     fun onTileDrawn(tile: Tile) {
@@ -406,9 +415,9 @@ class GameViewModel : ViewModel() {
         _placedTiles.clear()
         _placedTiles.addAll(updatedBoard.values)
 
-        // Clear selections
-        _selectedTile.value = null
-        // _currentTile.value = null
+        // Clear drawn tile and valid placements
+        _currentTile.value  = null
+        _validPlacements.value = emptyList()
 
         Log.d("GameViewModel", "Board now has ${updatedBoard.size} placed tiles")
     }
@@ -478,6 +487,11 @@ class GameViewModel : ViewModel() {
         Log.d("GameViewModel", "Meeple placement requested: $meepleId by player $playerId")
     }
 
+    fun skipMeeple(gameId: String) {
+        _isMeeplePlacementActive.value = false
+        joinedPlayerName?.let { webSocketClient.sendSkipMeeple(gameId, it) }
+    }
+
     private fun parseMeepleFromJson(json: JSONObject): Meeple {
         return Meeple(
             id = json.getString("id"),
@@ -511,25 +525,26 @@ class GameViewModel : ViewModel() {
         _currentPlayerId.value = id
     }
 
-    fun handleScoreUpdateMessage(json: JSONObject) {
-        val scoreArray = json.getJSONArray("scores")
-        val updatedPlayers = mutableListOf<Player>()
-        for (i in 0 until scoreArray.length()) {
-            val obj = scoreArray.getJSONObject(i)
-            val player = Player(
-                id = obj.getString("id"),
-                name = "", //Dummy Werte bis zu Refactorn
-                color = Color.Black,   //TODO Refactoren
-                score = obj.getInt("score"),
-                availableMeeples = obj.optInt("remainingMeeple", 0),
-                // userId = if (obj.has("user_id")) obj.getInt("user_id") else null
-            )
-            updatedPlayers.add(player)
+    fun updateGameWithScore(json: JSONObject) {
+        // Get array of player scores and build map by player ID
+        val arr = json.getJSONArray("scores")
+        val byId = (0 until arr.length()).associate { i ->
+            val o = arr.getJSONObject(i)
+            o.getString("player") to o
         }
 
-        _players.clear()
-        _players.addAll(updatedPlayers)
-        Log.d("WebSocket", "Updated player scores: $_players")
+        // Update score and remainingMeeple fields on Player list
+        _players.replaceAll { existing ->
+            byId[existing.id]?.let { payload ->
+                existing.copy(
+                    score = payload.getInt("score"),
+                    availableMeeples = payload.optInt("remainingMeeple", existing.availableMeeples)
+                )
+            } ?: existing
+        }
+
+        // Advance the UI to new current player
+        setCurrentPlayerId(json.optString("nextPlayer"))
     }
 }
 

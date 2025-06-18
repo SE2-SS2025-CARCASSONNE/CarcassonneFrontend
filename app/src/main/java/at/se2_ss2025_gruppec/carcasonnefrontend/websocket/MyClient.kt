@@ -22,13 +22,7 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.MeepleDto
 class MyClient(val callbacks: Callbacks) {
 
     private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
-    //private val WEBSOCKET_URI = "ws://192.168.8.54:8080/ws/game"
-
-    private lateinit var topicFlow: Flow<String>
-    private lateinit var collector: Job
-
-    private lateinit var jsonFlow: Flow<String>
-    private lateinit var jsonCollector: Job
+    //private val WEBSOCKET_URI = "ws://192.168.0.255:8080/ws/game"
 
     private lateinit var client: StompClient
     private var session: StompSession? = null
@@ -71,34 +65,6 @@ class MyClient(val callbacks: Callbacks) {
             } catch (e: Exception) {
                 Log.e("WebSocket", "WebSocket connection failed: ${e.message}")
                 callback("Login failed: ${e.message}")
-            }
-        }
-    }
-
-    fun sendHello() {
-        scope.launch {
-            try {
-                session?.sendText("/app/hello", "message from client")
-                Log.d("WebSocket", "Message sent: Hello")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send hello: ${e.message}")
-            }
-        }
-    }
-
-    fun sendJson() {
-        val json = JSONObject().apply {
-            put("from", "client")
-            put("text", "from client")
-        }
-        val message = json.toString()
-
-        scope.launch {
-            try {
-                session?.sendText("/app/object", message)
-                Log.d("WebSocket", "JSON message sent: $message")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send JSON: ${e.message}")
             }
         }
     }
@@ -175,6 +141,17 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+    fun sendPlaceTileRequest(payload: String){
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", payload)
+                Log.d("WebSocket", "Tile placement request sent: $payload")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send tile placement request: ${e.message}")
+
+            }
+        }
+    }
 
     fun sendPlaceMeeple(gameId: String, playerId: String, meepleId: String, tileId: String, position: String) {
         val json = JSONObject().apply {
@@ -184,7 +161,6 @@ class MyClient(val callbacks: Callbacks) {
             put("meeple", JSONObject().apply {
                 put("id", meepleId)
                 put("playerId", playerId)
-                // put("type", "MONK") // TODO MIKE: Sollte entfallen und rein im Backend gelöst werden.
                 put("tileId", tileId)
                 put("position", position)
             })
@@ -199,31 +175,16 @@ class MyClient(val callbacks: Callbacks) {
             }
         }
     }
-    fun sendPlaceTileRequest(payload: String){
-        scope.launch {
-            try {
-                session?.sendText("/app/game/send", payload)
-                Log.d("WebSocket", "Tile placement request sent: $payload")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send tile placement request: ${e.message}")
 
-            }
-        }
-    }
-
-    fun sendCalculateScoreRequest(gameId: String) {
+    fun sendSkipMeeple(gameId: String, playerId: String) {
         val json = JSONObject().apply {
-            put("type", "calculate_score")
-            put("gameId", gameId)
+            put("type",     "skip_meeple")
+            put("gameId",   gameId)
+            put("player",   playerId)
         }
-
         scope.launch {
-            try {
-                session?.sendText("/app/game/send", json.toString())
-                Log.d("WebSocket", "Calculate score request sent: $json")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send calculate score request: ${e.message}")
-            }
+            session?.sendText("/app/game/send", json.toString())
+            Log.d("WebSocket", "Skip meeple sent: $json")
         }
     }
 }

@@ -68,10 +68,8 @@ import org.json.JSONObject
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
-import androidx.core.graphics.drawable.toBitmap
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
-import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeepleType
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
@@ -105,7 +103,6 @@ class MainActivity : ComponentActivity() {
                         }).apply { connect() }
                     })
                 }
-
 
                 NavHost(navController = navController, startDestination = "landing") {
                     composable("landing") { LandingScreen(onStartTapped = {
@@ -394,14 +391,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                         }
                     }
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                PixelArtButton( //Just for development
-                    label = "Skip (for devs)",
-                    onClick = {
-                        onAuthSuccess("mock-jwt")
-                    }
-                )
+                Spacer(modifier = Modifier.height(100.dp))
             }
         }
     }
@@ -616,9 +606,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
-                val currentPlayer = json.optString("currentPlayer", playerName)
                 Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName")
-                viewModel.setJoinedPlayer(currentPlayer)
 
                 Handler(Looper.getMainLooper()).post {
                     players.clear()
@@ -635,7 +623,6 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
         while (!stompClient.isConnected()) {
             delay(100)
         }
-
         //Subscribe to both public and private channels
         stompClient.listenOn("/topic/game/$gameId") { handleLobbyMessage(it) }
         stompClient.listenOn("/user/queue/private") { handleLobbyMessage(it) }
@@ -807,11 +794,11 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(40.dp))
 
-            PlayerRow()
+            PlayerRow(viewModel)
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            TileBackRow(viewModel, gameId)
+            TileBackRow(viewModel, gameId, playerName)
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -833,7 +820,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                         if (viewModel.isValidPlacement(pos)) {
                             viewModel.placeTileAt(pos, gameId)
                         } else {
-                            Log.e("Game", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
+                            Log.e("Frontend Guard", "Invalid tile placement at $pos — no adjacent tiles or already occupied")
                         }
                     },
 
@@ -864,19 +851,6 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                             tileId  = targetTile.id,
                             position= zone.name
                         )
-
-                        /* currentTile?.let { tile ->
-                            val playerId = TokenManager.loggedInUsername ?: "unknown"
-                            //val meepleId = "test_meeple_123"
-
-                            if (zone != null) { // Stelle sicher, dass zone nicht null ist
-                                Log.d("GameplayScreen", "Meeple wird platziert mit gameId=$gameId, playerId=$playerId, tileId=${tile.id}, position=${zone.name}") // Debug-Log für placeMeeple
-                                viewModel.placeMeeple(gameId, playerId, meepleId, tile.id, zone.name)
-                            } else {
-                                Log.e("GameplayScreen", "Ungültige Meeple-Zone erkannt – keine Platzierung!")
-                            }
-                        } ?: Log.e("GameplayScreen", "Kein aktueller Tile vorhanden!") */
-
                     },
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 )
@@ -891,47 +865,63 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 }
 
 @Composable
-fun PlayerRow() {
+fun PlayerRow(viewModel: GameViewModel) {
+    val players = viewModel.players
+    val currentPlayerId by viewModel.currentPlayerId
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        listOf("Felix", "Sajo", "Jakob", "Mike", "Almin").forEachIndexed { index, name ->
+        players.forEach { p ->
+            val isCurrent = p.id == currentPlayerId
+            val tint = if (isCurrent) Color.Green else Color.White
+
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     imageVector = Icons.Default.Person,
-                    contentDescription = "Player",
-                    tint = if (index == 0) Color.Green else Color.White,
+                    contentDescription = "Player ${p.id}",
+                    tint = tint,
                     modifier = Modifier.size(30.dp)
                 )
-                Text(name, fontSize = 12.sp,
-                    color = if (index == 0) Color.Green else Color.White)
+                Text(text = p.id,
+                    color = tint,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "${p.score}P",
+                        color = Color.LightGray,
+                    fontSize = 11.sp
+                )
+
             }
         }
     }
 }
 
 @Composable
-fun TileBackRow(viewModel: GameViewModel, gameId: String) {
-    val counters = remember { listOf(mutableIntStateOf(18), mutableIntStateOf(18), mutableIntStateOf(18), mutableIntStateOf(17)) }
+fun TileBackRow(viewModel: GameViewModel, gameId: String, playerId: String) {
+    val deckRemaining by viewModel.deckRemaining.collectAsState(initial = 71)
+
+    val base = deckRemaining / 4
+    val extra = deckRemaining % 4
+    val piles = List(4) { index ->
+        base + if (index < extra) 1 else 0
+        base + if (index < extra) 1 else 0
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        repeat(4) { index ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                TileBackButton(
-                    remaining = counters[index].intValue,
-                    onClick = {
-                        if (counters[index].intValue > 0) {
-                            counters[index].intValue -= 1
-                            viewModel.requestTileFromBackend(gameId, "HOST")
-                        }
-                    },
-                    isEnabled = counters[index].intValue > 0
-                )
-            }
+        piles.forEachIndexed { index, remaining ->
+            TileBackButton(
+                remaining = remaining,
+                isEnabled = remaining > 0,
+                onClick = { viewModel.requestTileFromBackend(gameId, playerId) }
+            )
         }
     }
 }
@@ -1193,8 +1183,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                         modifier = Modifier
                             .size(65.dp)
                             .clickable {
-                                viewModel.setMeeplePlacement(false)
-                                viewModel.requestScoreUpdate(gameId) // Punkteberechnung starten
+                                viewModel.skipMeeple(gameId)
                             }
                     )
 
