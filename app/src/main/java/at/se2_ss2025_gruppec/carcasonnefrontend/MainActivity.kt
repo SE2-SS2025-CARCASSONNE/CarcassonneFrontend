@@ -606,9 +606,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
-                val currentPlayer = json.optString("currentPlayer", playerName)
                 Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName")
-                viewModel.setJoinedPlayer(currentPlayer)
 
                 Handler(Looper.getMainLooper()).post {
                     players.clear()
@@ -910,6 +908,7 @@ fun TileBackRow(viewModel: GameViewModel, gameId: String, playerId: String) {
     val base = deckRemaining / 4
     val extra = deckRemaining % 4
     val piles = List(4) { index ->
+        base + if (index < extra) 1 else 0
         base + if (index < extra) 1 else 0
     }
 

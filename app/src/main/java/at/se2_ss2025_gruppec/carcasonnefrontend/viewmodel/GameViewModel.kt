@@ -194,6 +194,15 @@ class GameViewModel : ViewModel() {
 
                 "score_update" -> {
                     updateGameWithScore(json)
+
+                    val phaseStr = json.optString("gamePhase", GamePhase.TILE_PLACEMENT.name)
+                    val newPhase = GamePhase.valueOf(phaseStr)
+                    val current = _uiState.value
+                    if (current is GameUiState.Success) {
+                        _uiState.value = GameUiState.Success(
+                            current.gameState.copy(gamePhase = newPhase)
+                        )
+                    }
                     _isMeeplePlacementActive.value = false
                     _currentTile.value = null
                     _validPlacements.value = emptyList()
