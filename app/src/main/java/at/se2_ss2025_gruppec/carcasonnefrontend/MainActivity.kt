@@ -592,11 +592,6 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
     fun handleLobbyMessage(message: String) {
         val json = JSONObject(message)
         when (json.getString("type")) {
-            "game_started" -> {
-                Handler(Looper.getMainLooper()).post {
-                    navController.navigate("gameplay/$gameId")
-                }
-            }
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
@@ -717,7 +712,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                     label = "Start Game",
                     onClick = {
                         Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
-                        stompClient.sendStartGame(gameId, playerName)
+                        navController.navigate("gameplay/$gameId") // Subscribe to game before start_game is sent, by switching to GameplayScreen
+                        Handler(Looper.getMainLooper()).postDelayed( {
+                            stompClient.sendStartGame(gameId, playerName)
+                        }, 50) // Increase delay if bug persists
                     }
                 )
             }
@@ -740,7 +738,6 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
         viewModel.setJoinedPlayer(playerName)
         viewModel.subscribeToGame(gameId)
         viewModel.subscribeToPrivate()
-        viewModel.joinGame(gameId, playerName)
     }
 
     // 🔊 Music switch (only once on enter)
