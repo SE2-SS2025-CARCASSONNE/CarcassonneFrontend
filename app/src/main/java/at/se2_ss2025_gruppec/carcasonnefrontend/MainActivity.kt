@@ -778,6 +778,15 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
     val uiState by viewModel.uiState.collectAsState()
 
+    val context = LocalContext.current
+
+    // Error-Toast abonnieren
+    LaunchedEffect(Unit) {
+        viewModel.errorEvents.collect { errorMsg ->
+            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // Phase-Flags (TILE-, MEEPLE- oder SCORING-Phase)
     // uiState kann Loading / Error / Success sein → deshalb erst casten
     val phase = (uiState as? GameUiState.Success)

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
@@ -13,8 +14,11 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 fun Tile.topColor(): Color = directionToColor(this.top)
@@ -64,6 +68,10 @@ class GameViewModel : ViewModel() {
 
     private val _remainingMeeples = MutableStateFlow(mapOf<String, Int>())
     val remainingMeeples: StateFlow<Map<String, Int>> get() = _remainingMeeples
+
+    // 1A) Channel für Error-Events vom WebSocket
+    private val _errorEvents = Channel<String>(Channel.BUFFERED)
+    val errorEvents = _errorEvents.receiveAsFlow()
 
 
     fun setMeeplePlacement(active: Boolean) {
@@ -215,6 +223,11 @@ class GameViewModel : ViewModel() {
                 "error" -> {
                     val message = json.getString("message")
                     Log.e("WebSocket", "Error from server: $message")
+
+                    // Fehlermeldung in den Channel senden
+                    viewModelScope.launch {
+                        _errorEvents.send(message)
+                    }
 
                     if (message.contains("no more playable tiles", ignoreCase = true)) {
                         clearCurrentTile()
