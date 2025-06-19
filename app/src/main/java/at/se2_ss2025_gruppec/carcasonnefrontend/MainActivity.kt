@@ -583,10 +583,6 @@ fun CreateGameScreen(navController: NavController) {
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
-    val backStackEntry = remember(navController, gameId) {
-        navController.getBackStackEntry("lobby/$gameId")
-    }
-    val viewModel: GameViewModel = viewModel(backStackEntry)
 
     val players = remember { mutableStateListOf(playerName) }
     val hostName = remember { mutableStateOf("") }
@@ -617,7 +613,6 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 
     LaunchedEffect(Unit) {
         while (!stompClient.isConnected()) delay(100)
-
         stompClient.listenOn("/topic/game/$gameId") { handleLobbyMessage(it) }
         stompClient.listenOn("/user/queue/private") { handleLobbyMessage(it) }
         delay(700)
@@ -754,8 +749,6 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
     }
 
     val uiState by viewModel.uiState.collectAsState()
-
-    val context = LocalContext.current
 
     // Error-Toast abonnieren
     LaunchedEffect(Unit) {
@@ -1124,10 +1117,9 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
     val context = LocalContext.current
     val tile = viewModel.currentTile.value //TODO: Mike oder doch collectAsState?
-    val currentPlayerId = viewModel.currentPlayerId.value
     val players = viewModel.players
-    val currentPlayer = players.find { it.id == currentPlayerId }
     val localPlayerId = TokenManager.loggedInUsername
+    val localPlayer = players.find { it.id == localPlayerId }
 
     val idx = players.indexOfFirst { it.id == localPlayerId }
         .let { if (it >= 0) it.coerceIn(0..3) else 0 }
@@ -1231,7 +1223,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                             .padding(horizontal = 25.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "${currentPlayer?.score ?: 0}P",
+                            text = "${localPlayer?.score ?: 0}P",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black

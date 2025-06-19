@@ -86,6 +86,8 @@ class GameViewModel : ViewModel() {
     }
 
     private lateinit var webSocketClient: MyClient
+    private var gameSubAdded = false
+    private var privateSubAdded = false
 
     fun setWebSocketClient(client: MyClient) {
         webSocketClient = client
@@ -96,15 +98,19 @@ class GameViewModel : ViewModel() {
     }
 
     fun subscribeToGame(gameId: String) {
+        if (gameSubAdded) return
         webSocketClient.listenOn("/topic/game/$gameId") { msg ->
             handleWebSocketMessage(msg)
+            gameSubAdded = true
         }
     }
 
     fun subscribeToPrivate() {
+        if (privateSubAdded) return
         webSocketClient.listenOn("/user/queue/private") { msg ->
             handleWebSocketMessage(msg)
         }
+        privateSubAdded = true
     }
 
     fun requestTileFromBackend(gameId: String, playerId: String) {
