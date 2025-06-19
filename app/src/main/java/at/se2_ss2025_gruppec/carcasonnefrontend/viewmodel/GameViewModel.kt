@@ -115,13 +115,16 @@ class GameViewModel : ViewModel() {
             when (type) {
                 "player_joined" -> {
                     val arr = json.getJSONArray("players")
+
+                    val colors = listOf(Color.Blue, Color.Yellow, Color.Red, Color.Green)
+
                     val newPlayers = (0 until arr.length()).map { i ->
                         Player(
                             id = arr.getString(i),
                             name = arr.getString(i),
                             score = 0,
                             availableMeeples = 7,
-                            color = Color.Green
+                            color = colors.getOrElse(i) { Color.Gray }
                         )
                     }
                     _players.clear()

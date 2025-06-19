@@ -806,7 +806,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                 val gameState = (uiState as GameUiState.Success).gameState
                 val placedTiles = gameState.board.values.toList()
                 val meeples     = gameState.meeples
-                val players = gameState.players
+                val players = viewModel.players                 // val players = gameState.players
 
                 PannableTileGrid(
                     tiles = placedTiles,
@@ -866,8 +866,10 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
 @Composable
 fun PlayerRow(viewModel: GameViewModel) {
-    val players = viewModel.players
+    val players         = viewModel.players
     val currentPlayerId by viewModel.currentPlayerId
+
+    val context = LocalContext.current
 
     Row(
         modifier = Modifier
@@ -875,27 +877,46 @@ fun PlayerRow(viewModel: GameViewModel) {
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        players.forEach { p ->
+        players.forEachIndexed { idx, p ->
             val isCurrent = p.id == currentPlayerId
+
+            // 1) Meeple-Drawable-Name per Index
+            val meepleName = when (idx.coerceIn(0..3)) {
+                0 -> "meeple_blu"
+                1 -> "meeple_yel"
+                2 -> "meeple_red"
+                else -> "meeple_grn"
+            }
+            // 2) Ressource holen
+            val resId = remember(meepleName) {
+                context.resources.getIdentifier(meepleName, "drawable", context.packageName)
+            }
+
+            // 3) Text-Tint abhängig ob aktuell
             val tint = if (isCurrent) Color.Green else Color.White
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Player ${p.id}",
-                    tint = tint,
-                    modifier = Modifier.size(30.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(4.dp)
+            ) {
+                // statt Icons.Default.Person
+                Image(
+                    painter = painterResource(id = resId),
+                    contentDescription = "Meeple von ${p.id}",
+                    modifier = Modifier
+                        .size(if (isCurrent) 36.dp else 30.dp)
                 )
-                Text(text = p.id,
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = p.id,
                     color = tint,
                     fontSize = 12.sp
                 )
                 Text(
                     text = "${p.score}P",
-                        color = Color.LightGray,
+                    color = Color.LightGray,
                     fontSize = 11.sp
                 )
-
             }
         }
     }
@@ -1076,9 +1097,9 @@ fun PannableTileGrid(
 
                 val drawableName = when (idx) {
                     0 -> "meeple_blu"
-                    1 -> "meeple_grn"
+                    1 -> "meeple_yel"
                     2 -> "meeple_red"
-                    else -> "meeple_yel"
+                    else -> "meeple_grn"
                 }
 
                 val rid = context.resources.getIdentifier(drawableName, "drawable", context.packageName)
@@ -1117,10 +1138,38 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
 
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
+    val context = LocalContext.current
     val tile = viewModel.currentTile.value //TODO: Mike oder doch collectAsState?
     val currentPlayerId = viewModel.currentPlayerId.value
     val players = viewModel.players
     val currentPlayer = players.find { it.id == currentPlayerId }
+    val localPlayerId = TokenManager.loggedInUsername
+
+    val idx = players.indexOfFirst { it.id == localPlayerId }
+        .let { if (it >= 0) it.coerceIn(0..3) else 0 }
+
+    val meepleDrawableName = when (idx) {
+        0 -> "meeple_blu"
+        1 -> "meeple_yel"
+        2 -> "meeple_red"
+        else -> "meeple_grn"
+    }
+
+    val meepleResId = remember(meepleDrawableName) {
+        context.resources.getIdentifier(meepleDrawableName, "drawable", context.packageName)
+    }
+
+    val noMeepleDrawableName = when (idx) {
+        0 -> "nomeeple_blu"
+        1 -> "nomeeple_yel"
+        2 -> "nomeeple_red"
+        else -> "nomeeple_grn"
+    }
+
+    val noMeepleResId = remember(idx) {
+        context.resources.getIdentifier(noMeepleDrawableName, "drawable", context.packageName)
+    }
+
     val remainingMeeples by viewModel.remainingMeeples.collectAsState()
     val isMeeplePlacementActive = viewModel.isMeeplePlacementActive.collectAsState()
     Log.d("MeeplePlacement", "UI State: ${isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
@@ -1143,7 +1192,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.meeple_blu),
+                    painter = painterResource(id = meepleResId),
                     contentDescription = "Meeple setzen",
                     modifier = Modifier
                         .size(if (isMeeplePlacementActive.value) 85.dp else 65.dp)
@@ -1154,7 +1203,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                     text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 7}",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = Color.Black
                 )
             }
 
@@ -1177,7 +1226,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.meeple_no),
+                        painter = painterResource(id = noMeepleResId),
                         contentDescription = "Meeple nicht setzen",
                         contentScale = ContentScale.FillBounds,
                         modifier = Modifier
