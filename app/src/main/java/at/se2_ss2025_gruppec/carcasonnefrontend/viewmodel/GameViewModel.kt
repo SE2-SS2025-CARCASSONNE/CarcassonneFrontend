@@ -121,7 +121,7 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    private fun handleWebSocketMessage(msg: String) {
+    fun handleWebSocketMessage(msg: String) {
         try {
             val json = JSONObject(msg)
             val type = json.getString("type")
@@ -214,16 +214,28 @@ class GameViewModel : ViewModel() {
 
                     val phaseStr = json.optString("gamePhase", GamePhase.TILE_PLACEMENT.name)
                     val newPhase = GamePhase.valueOf(phaseStr)
-                    val current = _uiState.value
-                    if (current is GameUiState.Success) {
-                        _uiState.value = GameUiState.Success(
-                            current.gameState.copy(gamePhase = newPhase)
-                        )
-                    }
+
                     _isMeeplePlacementActive.value = false
                     _currentTile.value = null
                     _validPlacements.value = emptyList()
                     _currentPlayerId.value = json.getString("nextPlayer")
+
+                    val current = _uiState.value
+                    if (current is GameUiState.Success) {
+                        _uiState.value = GameUiState.Success(
+                            current.gameState.copy(
+                                gamePhase = newPhase,
+                                meeples = emptyList()) // Remove meeples from board after scoring
+                        )
+                    }
+
+                    val scoresArr = json.getJSONArray("scores")
+                    for (i in 0 until scoresArr.length()) {
+                        val entry = scoresArr.getJSONObject(i)
+                        val playerId = entry.getString("player")
+                        val remaining = entry.getInt("remainingMeeple")
+                        updateRemainingMeeples(playerId, remaining)
+                    }
                 }
 
                 "error" -> {

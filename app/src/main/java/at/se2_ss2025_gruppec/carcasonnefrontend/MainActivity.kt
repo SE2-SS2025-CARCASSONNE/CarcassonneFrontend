@@ -583,6 +583,10 @@ fun CreateGameScreen(navController: NavController) {
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
+    val backStackEntry = remember(navController, gameId) {
+        navController.getBackStackEntry("lobby/$gameId")
+    }
+    val viewModel: GameViewModel = viewModel(backStackEntry)
 
     val players = remember { mutableStateListOf(playerName) }
     val hostName = remember { mutableStateOf("") }
@@ -590,8 +594,15 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
     val context = LocalContext.current
 
     fun handleLobbyMessage(message: String) {
+        viewModel.handleWebSocketMessage(message)
+
         val json = JSONObject(message)
         when (json.getString("type")) {
+            "game_started" -> {
+                Handler(Looper.getMainLooper()).post {
+                    navController.navigate("gameplay/$gameId")
+                }
+            }
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
@@ -712,10 +723,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                     label = "Start Game",
                     onClick = {
                         Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
-                        navController.navigate("gameplay/$gameId") // Subscribe to game before start_game is sent, by switching to GameplayScreen
-                        Handler(Looper.getMainLooper()).postDelayed( {
-                            stompClient.sendStartGame(gameId, playerName)
-                        }, 50) // Increase delay if bug persists
+                        stompClient.sendStartGame(gameId, playerName)
                     }
                 )
             }
@@ -1173,10 +1181,10 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 )
 
                 Text(
-                    text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 7}",
-                    fontSize = 22.sp,
+                    text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 0}",
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = Color.White
                 )
             }
 
