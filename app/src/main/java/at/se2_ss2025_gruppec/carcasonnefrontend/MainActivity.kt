@@ -873,7 +873,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                             Button(
                                 onClick = {
                                     showEndGameDialog.value = false
-                                    SoundManager.playMusic(context, R.raw.lobby_music)
+                                    SoundManager.playMusic(context, R.raw.endgame_music1)
                                     navController.popBackStack("main", false)
                                 },
                                 modifier = Modifier
