@@ -45,6 +45,7 @@ data class TileDto(
     val terrainEast: String,
     val terrainSouth: String,
     val terrainWest: String,
+    val terrainCenter: String?,
     val hasMonastery: Boolean,
     val hasShield: Boolean,
     val rotation: Int,
