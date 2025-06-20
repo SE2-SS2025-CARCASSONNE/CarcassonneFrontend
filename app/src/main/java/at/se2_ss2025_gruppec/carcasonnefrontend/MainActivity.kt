@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.compose.ui.graphics.Brush
 import androidx.navigation.compose.NavHost
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -846,37 +847,85 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                     SoundManager.playMusic(context, R.raw.lobby_music)
                 }
 
-                AlertDialog(
-                    onDismissRequest = {},
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                showEndGameDialog.value = false
-                                SoundManager.playMusic(context, R.raw.lobby_music)
-                                navController.popBackStack("main", false)
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF5A3A1A),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text("Close")
-                        }
-                    },
-                    title = { Text("Game Over", fontWeight = FontWeight.Bold) },
-                    text = {
-                        Column {
-                            Text("\uD83C\uDFC6 Winner: ${winner.value}", fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(8.dp))
-                            scores.sortedByDescending { it.second }.forEach { (name, score) ->
-                                Text("$name: $score points")
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color(0xFF2E1C0C), Color(0xFF4E342E))
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(32.dp)
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.bg_pxart),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer(alpha = 0.15f)
+                    )
+
+                    AlertDialog(
+                        onDismissRequest = {},
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showEndGameDialog.value = false
+                                    SoundManager.playMusic(context, R.raw.lobby_music)
+                                    navController.popBackStack("main", false)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF8D6E63),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Return to Main Menu", fontWeight = FontWeight.SemiBold)
                             }
-                        }
-                    },
-                    containerColor = Color(0xFF4E342E),
-                    titleContentColor = Color.White,
-                    textContentColor = Color.White
-                )
+                        },
+                        title = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "\uD83C\uDFC6 Game Over",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp,
+                                    color = Color(0xFFFFD700)
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Winner: ${winner.value}",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        },
+                        text = {
+                            Column(horizontalAlignment = Alignment.Start) {
+                                Spacer(Modifier.height(12.dp))
+                                scores.sortedByDescending { it.second }.forEachIndexed { index, (name, score) ->
+                                    Text(
+                                        text = "${index + 1}. $name – $score points",
+                                        fontSize = 16.sp,
+                                        color = if (name == winner.value) Color(0xFFFFD700) else Color.White,
+                                        fontWeight = if (name == winner.value) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        },
+                        containerColor = Color(0xFF3E2723),
+                        titleContentColor = Color.White,
+                        textContentColor = Color.White,
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
