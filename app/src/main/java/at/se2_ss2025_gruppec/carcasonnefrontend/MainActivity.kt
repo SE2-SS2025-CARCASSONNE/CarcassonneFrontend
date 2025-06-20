@@ -10,6 +10,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -99,16 +100,12 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(navController = navController, startDestination = "landing") {
                     composable("landing") { LandingScreen(onStartTapped = {
-                        navController.navigate("auth") {
-                            popUpTo("landing") { inclusive = true }
-                        }
+                        navController.navigate("auth")
                     })}
                     composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
                         TokenManager.userToken = jwtToken
                         userToken = jwtToken
-                        navController.navigate("main") {
-                            popUpTo("auth") { inclusive = true }
-                        }
+                        navController.navigate("main")
                     })}
                     composable("main") { MainScreen(navController) }
                     composable("join_game") { JoinGameScreen(navController) }
@@ -372,6 +369,8 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
 
 @Composable
 fun MainScreen(navController: NavController) {
+    BackHandler(enabled = true) {}
+
     Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
 
@@ -690,11 +689,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 
             Spacer(modifier = Modifier.height(56.dp))
 
-            if (hostName.value == playerName) {
+            if (hostName.value == playerName && players.size > 1) {
                 PixelArtButton(
                     label = "Start Game",
                     onClick = {
-                        Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
                         stompClient.sendStartGame(gameId, playerName)
                     }
                 )
@@ -706,6 +704,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
+    BackHandler(enabled = true) {}
     val context = LocalContext.current
 
     val backStackEntry = remember(navController, gameId) {
