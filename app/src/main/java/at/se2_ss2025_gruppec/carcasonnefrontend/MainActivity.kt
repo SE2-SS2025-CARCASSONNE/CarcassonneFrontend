@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.compose.ui.graphics.Brush
 import androidx.navigation.compose.NavHost
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -63,6 +64,11 @@ import kotlinx.coroutines.delay
 import org.json.JSONObject
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.*
+import androidx.compose.foundation.shape.CircleShape
+import kotlin.random.Random
+import androidx.compose.foundation.layout.offset
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
@@ -707,6 +713,9 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 @Composable
 fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
     val context = LocalContext.current
+    val showEndGameDialog = remember { mutableStateOf(false) }
+    val winner = remember { mutableStateOf("") }
+    val scores = remember { mutableStateListOf<Pair<String, Int>>() }
 
     val backStackEntry = remember(navController, gameId) {
         navController.getBackStackEntry("lobby/$gameId")
@@ -716,9 +725,28 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
     LaunchedEffect(gameId) {
         viewModel.setWebSocketClient(stompClient)
         viewModel.setJoinedPlayer(playerName)
+
+        while (!stompClient.isConnected()) delay(100)
+
+        stompClient.listenOn("/topic/game/$gameId") { msg ->
+            val json = JSONObject(msg)
+            if (json.getString("type") == "game_over") {
+                val winnerName = json.getString("winner")
+                val scoreArray = json.getJSONArray("scores")
+                val parsedScores = mutableListOf<Pair<String, Int>>()
+                for (i in 0 until scoreArray.length()) {
+                    val entry = scoreArray.getJSONObject(i)
+                    parsedScores.add(entry.getString("player") to entry.getInt("score"))
+                }
+                winner.value = winnerName
+                scores.clear()
+                scores.addAll(parsedScores)
+                showEndGameDialog.value = true
+            }
+        }
     }
 
-    // 🔊 Music switch (only once on enter)
+    //Music switch (only once on enter)
     LaunchedEffect(Unit) {
         SoundManager.playMusic(context, R.raw.gameplay_music)
     }
@@ -812,6 +840,93 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
             Spacer(modifier = Modifier.height(20.dp))
 
             BottomScreenBar(viewModel, gameId)
+            if (showEndGameDialog.value) {
+                ConfettiAnimation(visible = true)
+
+                LaunchedEffect(Unit) {
+                    SoundManager.playMusic(context, R.raw.endgame_music1)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color(0xFF2E1C0C), Color(0xFF4E342E))
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(32.dp)
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.bg_pxart),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer(alpha = 0.15f)
+                    )
+
+                    AlertDialog(
+                        onDismissRequest = {},
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showEndGameDialog.value = false
+                                    SoundManager.playMusic(context, R.raw.lobby_music)
+                                    navController.popBackStack("main", false)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF8D6E63),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Return to Main Menu", fontWeight = FontWeight.SemiBold)
+                            }
+                        },
+                        title = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "\uD83C\uDFC6 Game Over",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp,
+                                    color = Color(0xFFFFD700)
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Winner: ${winner.value}",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        },
+                        text = {
+                            Column(horizontalAlignment = Alignment.Start) {
+                                Spacer(Modifier.height(12.dp))
+                                scores.sortedByDescending { it.second }.forEachIndexed { index, (name, score) ->
+                                    Text(
+                                        text = "${index + 1}. $name – $score points",
+                                        fontSize = 16.sp,
+                                        color = if (name == winner.value) Color(0xFFFFD700) else Color.White,
+                                        fontWeight = if (name == winner.value) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        },
+                        containerColor = Color(0xFF3E2723),
+                        titleContentColor = Color.White,
+                        textContentColor = Color.White,
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
     }
 }
@@ -1334,3 +1449,73 @@ fun PixelArtTitle(
         )
     }
 }
+@Composable
+fun ConfettiAnimation(
+    visible: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (!visible) return
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val confettiList = remember { mutableStateListOf<ConfettiParticle>() }
+
+    LaunchedEffect(visible) {
+        while (visible) {
+            repeat(8) {
+                confettiList.add(
+                    ConfettiParticle(
+                        x = Random.nextInt(0, screenWidth.value.toInt()).dp,
+                        color = Color(
+                            red = Random.nextFloat(),
+                            green = Random.nextFloat(),
+                            blue = Random.nextFloat()
+                        )
+                    )
+                )
+            }
+            delay(200)
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        confettiList.forEach { particle ->
+            ConfettiFallingItem(
+                x = particle.x,
+                color = particle.color,
+                screenHeight = screenHeight,
+                onFinished = { confettiList.remove(particle) }
+            )
+        }
+    }
+}
+
+@Composable
+fun ConfettiFallingItem(
+    x: Dp,
+    color: Color,
+    screenHeight: Dp,
+    onFinished: () -> Unit
+) {
+    val yOffset = remember { Animatable(-10f) }
+    LaunchedEffect(Unit) {
+        yOffset.animateTo(
+            targetValue = screenHeight.value + 20f,
+            animationSpec = tween(
+                durationMillis = 2500 + Random.nextInt(0, 1000),
+                easing = LinearEasing
+            )
+        )
+        onFinished()
+    }
+    Box(
+        modifier = Modifier
+            .offset(x = x, y = yOffset.value.dp)
+            .size(8.dp)
+            .background(color = color, shape = CircleShape)
+    )
+}
+
+data class ConfettiParticle(
+    val x: Dp,
+    val color: Color
+)
