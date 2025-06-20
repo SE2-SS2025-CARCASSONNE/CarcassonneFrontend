@@ -15,7 +15,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -30,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -48,7 +46,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.navigation.compose.composable
@@ -73,10 +70,6 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameUiState
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.bottomColor
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.leftColor
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.topColor
 import kotlin.math.floor
 import androidx.core.graphics.createBitmap
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
@@ -288,26 +281,6 @@ fun LandingScreen(onStartTapped: () -> Unit) {
         }
     }
 }
-@Composable
-fun TileView(tile: Tile) {
-    Box(
-        modifier = Modifier
-            .size(64.dp)
-            .border(2.dp, Color.White)
-            .drawBehind {
-                val width = size.width
-                val height = size.height
-                val edge = 10f
-
-                drawRect(color = tile.topColor(), topLeft = Offset(0f, 0f), size = Size(width, edge))
-                drawRect(color = tile.rightColor(), topLeft = Offset(width - edge, 0f), size = Size(edge, height))
-                drawRect(color = tile.bottomColor(), topLeft = Offset(0f, height - edge), size = Size(width, edge))
-                drawRect(color = tile.leftColor(), topLeft = Offset(0f, 0f), size = Size(edge, height))
-
-                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
-            }
-    )
-}
 
 @Composable
 fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewModel()
@@ -493,7 +466,6 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                                     token = "Bearer $token",
                                     gameId = gameId
                                 )
-                                val playerCount = gameState.players.size.coerceAtLeast(2)
                                 navController.navigate("lobby/$gameId")
                             } catch (e: Exception) {
                                 Log.e("JoinGame", "Exception during getGame: ${e.message}", e)
@@ -956,7 +928,6 @@ fun TileBackButton(
     }
 }
 
-@SuppressLint("DiscouragedApi")
 @Composable
 fun PannableTileGrid(
     tiles:       List<Tile>,
@@ -987,17 +958,17 @@ fun PannableTileGrid(
         /* ❶ Pan & Zoom – immer aktiv */
         .pointerInput(Unit) {
             detectTransformGestures { _, pan, zoom, _ ->
-                scale.value   *= zoom
-                offsetX.value += pan.x
-                offsetY.value += pan.y
+                scale.floatValue   *= zoom
+                offsetX.floatValue += pan.x
+                offsetY.floatValue += pan.y
             }
         }
         /* ❷ Tap-Handling – hängt vom Modus ab */
         .pointerInput(tileMode, meepleMode) {
             detectTapGestures { offset ->
-                val scaled = tileSizePx * scale.value
-                val x = floor((offset.x - offsetX.value) / scaled).toInt()
-                val y = floor((offset.y - offsetY.value) / scaled).toInt()
+                val scaled = tileSizePx * scale.floatValue
+                val x = floor((offset.x - offsetX.floatValue) / scaled).toInt()
+                val y = floor((offset.y - offsetY.floatValue) / scaled).toInt()
 
                 /* ---------- TILE ---------- */
                 if (tileMode) onTileClick(x, y)
@@ -1005,8 +976,8 @@ fun PannableTileGrid(
                 /* ---------- MEEPLE ---------- */
                 if (meepleMode) {
                     val seg = scaled / 3f
-                    val localX = offset.x - (x * scaled + offsetX.value)
-                    val localY = offset.y - (y * scaled + offsetY.value)
+                    val localX = offset.x - (x * scaled + offsetX.floatValue)
+                    val localY = offset.y - (y * scaled + offsetY.floatValue)
 
                     val zone = when {
                         localX <  seg         && localY in  seg..2*seg -> MeeplePosition.W
@@ -1030,14 +1001,14 @@ fun PannableTileGrid(
             .then(gestureModifier)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val scaledSize = (tileSizePx * scale.value).coerceAtLeast(1f)
+            val scaledSize = (tileSizePx * scale.floatValue).coerceAtLeast(1f)
             val seg        = scaledSize / 3f
 
             /* ---------- 1) Tiles ---------- */
             tiles.forEach { tile ->
                 val pos  = tile.position ?: return@forEach
-                val left = pos.x * scaledSize + offsetX.value
-                val top  = pos.y * scaledSize + offsetY.value
+                val left = pos.x * scaledSize + offsetX.floatValue
+                val top  = pos.y * scaledSize + offsetY.floatValue
 
                 val baseName  = tile.id.substringBeforeLast("-").replace("-", "_")
                 val derivedId = context.resources.getIdentifier(baseName, "drawable", context.packageName)
@@ -1060,8 +1031,8 @@ fun PannableTileGrid(
 
             /* ---------- 2) Meeples ---------- */
             meeples.forEach { meeple ->
-                val px = meeple.x * scaledSize + offsetX.value
-                val py = meeple.y * scaledSize + offsetY.value
+                val px = meeple.x * scaledSize + offsetX.floatValue
+                val py = meeple.y * scaledSize + offsetY.floatValue
 
                 val (cx, cy) = when (meeple.position) {
                     MeeplePosition.W -> seg*0.5f to seg*1.5f
@@ -1296,7 +1267,6 @@ fun parseErrorMessage(body: String?): String {
     }
 }
 
-@SuppressLint("DiscouragedApi")
 @Composable
 fun DrawTile(tile: Tile, viewModel: GameViewModel) {
     val context = LocalContext.current
@@ -1338,9 +1308,9 @@ fun DrawTile(tile: Tile, viewModel: GameViewModel) {
 
 @Composable
 fun PixelArtTitle(
+    modifier: Modifier = Modifier,
     title: String,
-    backgroundRes: Int = R.drawable.bg_pxart,
-    modifier: Modifier = Modifier
+    backgroundRes: Int = R.drawable.bg_pxart
 ) {
     Box(
         modifier = modifier
