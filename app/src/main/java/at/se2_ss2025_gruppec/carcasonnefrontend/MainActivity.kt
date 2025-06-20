@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.*
 import androidx.compose.foundation.shape.CircleShape
 import kotlin.random.Random
 import androidx.compose.foundation.layout.offset
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.UserStatsDto
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
@@ -378,6 +379,12 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
 
 @Composable
 fun MainScreen(navController: NavController) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var showStatsPopup by remember { mutableStateOf(false) }
+    var stats by remember { mutableStateOf<UserStatsDto?>(null) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
 
@@ -395,17 +402,99 @@ fun MainScreen(navController: NavController) {
                     }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
+
                 PixelArtButton(
                     label = "Create Game",
                     onClick = {
                         navController.navigate("create_game")
                     }
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                PixelArtButton(
+                    label = "Statistics",
+                    onClick = {
+                        showStatsPopup = true
+                        coroutineScope.launch {
+                            try {
+                                val token = TokenManager.userToken
+                                if (token != null) {
+                                    val bearer = "Bearer $token"
+                                    val result = ApiClient.statsApi.getUserStats(bearer)
+                                    stats = result
+                                } else {
+                                    Toast.makeText(context, "Not logged in", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to load stats", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                )
+            }
+        }
+
+        if (showStatsPopup) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable { showStatsPopup = false }
+            ) {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                        .widthIn(max = 280.dp) // Adjusted width
+                        .clickable(enabled = false) {}, // Prevents background click passing
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2E3A59))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Player Statistics",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        stats?.let {
+                            StatLine(label = "Games Played", value = it.totalGames.toString())
+                            StatLine(label = "Games Won", value = it.totalWins.toString())
+                            StatLine(label = "Win Ratio", value = "${(it.winRatio * 100).toInt()}%")
+                            StatLine(label = "High Score", value = it.highScore.toString())
+                        } ?: Text("Loading...", color = Color.White)
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Tap anywhere to dismiss",
+                            fontSize = 12.sp,
+                            color = Color.LightGray,
+                            modifier = Modifier.graphicsLayer(alpha = 0.7f)
+                        )
+                    }
+                }
             }
         }
     }
 }
-
+@Composable
+fun StatLine(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, color = Color.White, fontSize = 16.sp)
+        Text(text = value, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
 @Composable
 fun JoinGameScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
