@@ -182,4 +182,20 @@ class MyClient(val callbacks: Callbacks) {
             Log.d("WebSocket", "Skip meeple sent: $json")
         }
     }
+    fun sendEndGame(gameId: String, player: String) {
+        val json = JSONObject().apply {
+            put("type", "end_game")
+            put("gameId", gameId)
+            put("player", player)
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "End game message sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send end game message: ${e.message}")
+            }
+        }
+    }
 }
