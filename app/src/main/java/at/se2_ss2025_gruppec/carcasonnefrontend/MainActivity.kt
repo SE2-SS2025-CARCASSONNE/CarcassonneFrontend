@@ -744,8 +744,6 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
     LaunchedEffect(gameId) {
         viewModel.setWebSocketClient(stompClient)
         viewModel.setJoinedPlayer(playerName)
-        viewModel.subscribeToGame(gameId)
-        viewModel.subscribeToPrivate()
     }
 
     // 🔊 Music switch (only once on enter)
@@ -1181,7 +1179,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 )
 
                 Text(
-                    text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 0}",
+                    text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 7}",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -1193,8 +1191,10 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 modifier = Modifier.height(170.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                tile?.let {
-                    DrawTile(it, viewModel)
+                if (tile != null) {
+                    DrawTile(tile, viewModel)
+                } else {
+                    Spacer(modifier = Modifier.size(135.dp))
                 }
             }
 
@@ -1209,7 +1209,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                     Image(
                         painter = painterResource(id = noMeepleResId),
                         contentDescription = "Meeple nicht setzen",
-                        contentScale = ContentScale.FillBounds,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .size(65.dp)
                             .clickable {

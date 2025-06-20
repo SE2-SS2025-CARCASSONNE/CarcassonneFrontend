@@ -76,7 +76,6 @@ class GameViewModel : ViewModel() {
 
     fun setMeeplePlacement(active: Boolean) {
         _isMeeplePlacementActive.value = active
-        Log.d("MeeplePlacement", "Meeple Placement Active: ${_isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
     }
 
     fun updateRemainingMeeples(playerId: String, meepleCount: Int) {
@@ -86,31 +85,9 @@ class GameViewModel : ViewModel() {
     }
 
     private lateinit var webSocketClient: MyClient
-    private var gameSubAdded = false
-    private var privateSubAdded = false
 
     fun setWebSocketClient(client: MyClient) {
         webSocketClient = client
-    }
-
-    fun joinGame(gameId: String, playerName: String) {
-        webSocketClient.sendJoinGame(gameId, playerName)
-    }
-
-    fun subscribeToGame(gameId: String) {
-        if (gameSubAdded) return
-        webSocketClient.listenOn("/topic/game/$gameId") { msg ->
-            handleWebSocketMessage(msg)
-            gameSubAdded = true
-        }
-    }
-
-    fun subscribeToPrivate() {
-        if (privateSubAdded) return
-        webSocketClient.listenOn("/user/queue/private") { msg ->
-            handleWebSocketMessage(msg)
-        }
-        privateSubAdded = true
     }
 
     fun requestTileFromBackend(gameId: String, playerId: String) {
@@ -224,8 +201,7 @@ class GameViewModel : ViewModel() {
                     if (current is GameUiState.Success) {
                         _uiState.value = GameUiState.Success(
                             current.gameState.copy(
-                                gamePhase = newPhase,
-                                meeples = emptyList()) // Remove meeples from board after scoring
+                                gamePhase = newPhase)
                         )
                     }
 
@@ -292,6 +268,20 @@ class GameViewModel : ViewModel() {
                     } catch (e: Exception) {
                         Log.e("WebSocket", "Fehler beim Verarbeiten von meeple_placed: ${e.message}")
                         _uiState.value = GameUiState.Error("Fehler beim Setzen des Meeples: ${e.message}")
+                    }
+                }
+
+                "meeple_removed" -> {
+                    val ids = json.getJSONArray("ids").let { arr ->
+                            List(arr.length()) { i -> arr.getString(i) }
+                        }
+
+                    (_uiState.value as? GameUiState.Success)?.let { success ->
+                        val meeplesOnBoard = success.gameState.meeples
+                            .filterNot { it.id in ids }
+                        _uiState.value = GameUiState.Success(
+                            success.gameState.copy(meeples = meeplesOnBoard)
+                        )
                     }
                 }
 
