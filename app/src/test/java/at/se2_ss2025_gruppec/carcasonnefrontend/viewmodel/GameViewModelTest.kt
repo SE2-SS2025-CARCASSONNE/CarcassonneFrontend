@@ -1,76 +1,158 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel
-/*
-import org.json.JSONArray
-import org.json.JSONObject
-import org.junit.Assert.*
+
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
+import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class GameViewModelTest {
 
+    @get:Rule
+    val instantTaskExecutorRule = InstantTaskExecutorRule()
+
+    private val testDispatcher = StandardTestDispatcher()
     private lateinit var viewModel: GameViewModel
+    private lateinit var mockClient: MyClient
 
     @Before
-    fun setUp() {
+    fun setup() {
+        Dispatchers.setMain(testDispatcher)
+        mockClient = mockk(relaxed = true)
         viewModel = GameViewModel()
+        viewModel.setWebSocketClient(mockClient)
+        viewModel.setJoinedPlayer("player1")
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     @Test
-    fun handleScoreUpdateMessage_updatesPlayerScores_correctly() {
-        // Given: JSON mit drei Spielern und verschiedenen Punkten
-        val scoresArray = JSONArray().apply {
-            put(JSONObject().apply {
-                put("id", "anna")
-                put("score", 12)
-            })
-            put(JSONObject().apply {
-                put("id", "ben")
-                put("score", 8)
-            })
-            put(JSONObject().apply {
-                put("id", "céline")
-                put("score", 0)
-            })
-        }
-        val json = JSONObject().apply {
-            put("scores", scoresArray)
-        }
+    fun `rotateCurrentTile should rotate clockwise`() = runTest {
+        val tile = Tile("t1", "ROAD", "CITY", "FIELD", "CITY", tileRotation = TileRotation.NORTH)
+        viewModel.onTileDrawn(tile)
 
-        // When
-        viewModel.handleScoreUpdateMessage(json)
+        viewModel.rotateCurrentTile()
+        assertEquals(TileRotation.EAST, viewModel.currentTile.value?.tileRotation)
 
-        // Then
-        val players = viewModel.players
-        assertEquals(3, players.size)
-
-        // Prüfe nur score-Feld für jeden Spieler
-        assertTrue(players.any { it.id == "anna"   && it.score == 12 })
-        assertTrue(players.any { it.id == "ben"    && it.score == 8 })
-        assertTrue(players.any { it.id == "céline" && it.score == 0 })
+        viewModel.rotateCurrentTile()
+        assertEquals(TileRotation.SOUTH, viewModel.currentTile.value?.tileRotation)
     }
 
     @Test
-    fun handleScoreUpdateMessage_overwritesExistingScores_onRepeatedCalls() {
-        // Erstaufruf: anna=5, ben=7
-        viewModel.handleScoreUpdateMessage(JSONObject().apply {
-            put("scores", JSONArray().apply {
-                put(JSONObject().put("id", "anna").put("score", 5))
-                put(JSONObject().put("id", "ben").put("score", 7))
-            })
-        })
-        // Zweitaufruf: anna=15, ben=3
-        viewModel.handleScoreUpdateMessage(JSONObject().apply {
-            put("scores", JSONArray().apply {
-                put(JSONObject().put("id", "anna").put("score", 15))
-                put(JSONObject().put("id", "ben").put("score", 3))
-            })
-        })
+    fun `clearCurrentTile should reset currentTile to null`() = runTest {
+        val tile = Tile("t1", "CITY", "CITY", "ROAD", "FIELD")
+        viewModel.onTileDrawn(tile)
+        viewModel.clearCurrentTile()
 
-        // Now: scores should be updated (nicht summiert!)
-        val anna = viewModel.players.find { it.id == "anna" }!!
-        val ben  = viewModel.players.find { it.id == "ben" }!!
-        assertEquals(15, anna.score)
-        assertEquals(3,  ben.score)
+        assertEquals(null, viewModel.currentTile.value)
+    }
+
+    @Test
+    fun `placeTileAt should send tile payload if connected`() = runTest {
+        every { mockClient.isConnected() } returns true
+
+        val tile =
+            Tile("tile123", "ROAD", "CITY", "FIELD", "ROAD", tileRotation = TileRotation.NORTH)
+        viewModel.onTileDrawn(tile)
+
+        val pos = Position(2, 3)
+        viewModel.placeTileAt(pos, "game123")
+
+        verify {
+            mockClient.sendPlaceTileRequest(match {
+                it.contains("\"type\":\"place_tile\"") &&
+                        it.contains("\"gameId\":\"game123\"") &&
+                        it.contains("\"x\":2") &&
+                        it.contains("\"y\":3") &&
+                        it.contains("\"id\":\"tile123\"")
+            })
+        }
+    }
+
+    @Test
+    fun `placeTileAt should not send if WebSocket is not connected`() = runTest {
+        every { mockClient.isConnected() } returns false
+        val tile = Tile("tile123", "CITY", "FIELD", "ROAD", "ROAD")
+        viewModel.onTileDrawn(tile)
+        viewModel.placeTileAt(Position(1, 1), "gameABC")
+
+        verify(exactly = 0) { mockClient.sendPlaceTileRequest(any()) }
+    }
+
+    @Test
+    fun `placeMeeple should forward correct parameters`() = runTest {
+        viewModel.placeMeeple("game1", "p1", "m1", "tile1", "CENTER")
+
+        verify {
+            mockClient.sendPlaceMeeple("game1", "p1", "m1", "tile1", "CENTER")
+        }
+    }
+
+    @Test
+    fun `skipMeeple should call sendSkipMeeple if joined player set`() = runTest {
+        viewModel.skipMeeple("gameX")
+        verify {
+            mockClient.sendSkipMeeple("gameX", "player1")
+        }
+    }
+
+    @Test
+    fun `setMeeplePlacement and updateRemainingMeeples should update state flows`() = runTest {
+        viewModel.setMeeplePlacement(true)
+        assertTrue(viewModel.isMeeplePlacementActive.value)
+
+        viewModel.updateRemainingMeeples("p1", 5)
+        assertEquals(5, viewModel.remainingMeeples.value["p1"])
+    }
+
+    @Test
+    fun `isValidPlacement returns false if tile is null or already placed`() = runTest {
+        assertFalse(viewModel.isValidPlacement(Position(0, 0)))
+
+        val tile = Tile("t1", "FIELD", "FIELD", "ROAD", "FIELD", position = Position(1, 1))
+        viewModel.onTileDrawn(tile)
+        viewModel.placeTileAt(Position(1, 1), "gameZ") // will place it
+
+        // Simulate board update manually
+        viewModel.handleWebSocketMessage(
+            """{
+                "type":"board_update",
+                "tile":{
+                    "id":"t1",
+                    "terrainNorth":"FIELD",
+                    "terrainEast":"FIELD",
+                    "terrainSouth":"ROAD",
+                    "terrainWest":"FIELD",
+                    "tileRotation":"NORTH",
+                    "position":{"x":1,"y":1}
+                },
+                "player":{"id":"player1"},
+                "gamePhase":"TILE_PLACEMENT"
+            }"""
+        )
+        advanceUntilIdle()
+
+        assertFalse(viewModel.isValidPlacement(Position(1, 1))) // Already occupied
     }
 }
-*/
