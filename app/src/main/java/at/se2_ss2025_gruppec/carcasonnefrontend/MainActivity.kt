@@ -156,11 +156,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GlobalSoundMenu() {
     var showVolumeControl by remember { mutableStateOf(false) }
-    var volumeLevel by remember { mutableStateOf(0.5f) }
-    var isMuted by remember { mutableStateOf(false) }
+    var volumeLevel by remember { mutableStateOf(SoundManager.volume) }
+    var isMuted by remember { mutableStateOf(SoundManager.isMuted) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Top-right floating gear icon
         IconButton(
             onClick = { showVolumeControl = !showVolumeControl },
             modifier = Modifier
@@ -176,15 +175,13 @@ fun GlobalSoundMenu() {
         }
 
         if (showVolumeControl) {
-            // Transparent full-screen dismiss layer
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Transparent)
-                    .clickable { showVolumeControl = false } // click outside = close
+                    .clickable { showVolumeControl = false }
             )
 
-            // Settings popup on top
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -214,7 +211,7 @@ fun GlobalSoundMenu() {
                         Button(
                             onClick = {
                                 isMuted = true
-                                SoundManager.setVolume(0f)
+                                SoundManager.mute()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A4A2A))
                         ) {
@@ -223,7 +220,7 @@ fun GlobalSoundMenu() {
                         Button(
                             onClick = {
                                 isMuted = false
-                                SoundManager.setVolume(volumeLevel)
+                                SoundManager.unmute()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A4A2A))
                         ) {
