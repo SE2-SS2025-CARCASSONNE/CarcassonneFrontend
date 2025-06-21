@@ -32,6 +32,7 @@ data class Tile(
     val right: String,
     val bottom: String,
     val left: String,
+    val center: String,
     val hasMonastery: Boolean = false,
     val hasShield: Boolean = false,
     val tileRotation: TileRotation = TileRotation.NORTH,
