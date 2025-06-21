@@ -1,6 +1,7 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.annotation.SuppressLint
+import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -10,6 +11,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -87,6 +89,7 @@ import androidx.compose.foundation.BorderStroke
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         SoundManager.playMusic(this, R.raw.lobby_music)
 
         setContent {
@@ -106,16 +109,12 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(navController = navController, startDestination = "landing") {
                     composable("landing") { LandingScreen(onStartTapped = {
-                        navController.navigate("auth") {
-                            popUpTo("landing") { inclusive = true }
-                        }
+                        navController.navigate("auth")
                     })}
                     composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
                         TokenManager.userToken = jwtToken
                         userToken = jwtToken
-                        navController.navigate("main") {
-                            popUpTo("auth") { inclusive = true }
-                        }
+                        navController.navigate("main")
                     })}
                     composable("main") { MainScreen(navController) }
                     composable("join_game") { JoinGameScreen(navController) }
@@ -290,9 +289,9 @@ fun LandingScreen(onStartTapped: () -> Unit) {
 fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    var username = viewModel.username
-    var password = viewModel.password
-    var isLoading = viewModel.isLoading
+    val username = viewModel.username
+    val password = viewModel.password
+    val isLoading = viewModel.isLoading
 
     LaunchedEffect(true) {
         viewModel.uiEvents.collect { message -> // Collect messages from ViewModel
@@ -376,6 +375,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
 
 @Composable
 fun MainScreen(navController: NavController) {
+    BackHandler(enabled = true) {}
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -480,6 +480,7 @@ fun MainScreen(navController: NavController) {
         }
     }
 }
+
 @Composable
 fun StatLine(label: String, value: String) {
     Row(
@@ -492,6 +493,7 @@ fun StatLine(label: String, value: String) {
         Text(text = value, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
+
 @Composable
 fun JoinGameScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
@@ -539,13 +541,13 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                     label = "Join",
                     onClick = {
                         if (gameId.isBlank()) {
-                            Toast.makeText(context, "Please enter a game ID", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Please enter a game ID!", Toast.LENGTH_SHORT).show()
                             return@PixelArtButton
                         }
 
                         val username = TokenManager.loggedInUsername
                         if (username.isNullOrBlank()) {
-                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "No user logged in!", Toast.LENGTH_SHORT).show()
                             return@PixelArtButton
                         }
 
@@ -554,7 +556,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                                 val token = TokenManager.userToken
                                     ?: throw IllegalStateException("Token is required, but was null!")
 
-                                val gameState = gameApi.getGame(
+                                gameApi.getGame(
                                     token = "Bearer $token",
                                     gameId = gameId
                                 )
@@ -618,9 +620,7 @@ fun CreateGameScreen(navController: NavController) {
                 PixelArtButton(
                     label = "Create",
                     onClick = {
-                        val hostName = TokenManager.loggedInUsername ?: return@PixelArtButton.also {
-                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
-                        }
+                        val hostName = TokenManager.loggedInUsername ?: return@PixelArtButton
 
                         coroutineScope.launch {
                             try {
@@ -630,7 +630,7 @@ fun CreateGameScreen(navController: NavController) {
                                     token = "Bearer $token",
                                     request = CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
-                                Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, "Game created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
                                 navController.navigate("lobby/${response.gameId}")
 
                             } catch (e: Exception) {
@@ -734,7 +734,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                     Spacer(modifier = Modifier.width(12.dp))
                     IconButton(onClick = {
                         clipboardManager.setText(AnnotatedString(gameId))
-                        Toast.makeText(context, "Copied Game ID", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Copied game ID!", Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
@@ -782,11 +782,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 
             Spacer(modifier = Modifier.height(56.dp))
 
-            if (hostName.value == playerName) {
+            if (hostName.value == playerName && players.size > 1) {
                 PixelArtButton(
                     label = "Start Game",
                     onClick = {
-                        Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
                         stompClient.sendStartGame(gameId, playerName)
                     }
                 )
@@ -798,6 +797,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
+    BackHandler(enabled = true) {}
     val context = LocalContext.current
     val showEndGameDialog = remember { mutableStateOf(false) }
     val winner = remember { mutableStateOf("") }
@@ -1291,7 +1291,7 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
     val context = LocalContext.current
-    val tile = viewModel.currentTile.value //TODO: Mike oder doch collectAsState?
+    val tile = viewModel.currentTile.value
     val players = viewModel.players
     val localPlayerId = TokenManager.loggedInUsername
     val localPlayer = players.find { it.id == localPlayerId }
