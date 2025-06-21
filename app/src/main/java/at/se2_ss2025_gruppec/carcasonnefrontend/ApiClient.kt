@@ -1,5 +1,6 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.UserStatsDto
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
@@ -55,14 +56,22 @@ interface AuthApi {
     suspend fun register(@Body request: RegisterRequest)
 }
 
+// Retrofit API interface for stats
+interface StatsApi {
+    @GET("api/game/stats")
+    suspend fun getUserStats(
+        @Header("Authorization") token: String
+    ): UserStatsDto
+}
+
 // Singleton Retrofit client
 object ApiClient {
     private val retrofit = Retrofit.Builder()
-        //.baseUrl("http://10.0.2.2:8080/") // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
-        .baseUrl("http://192.168.0.12:8080/")
+        .baseUrl("http://10.0.2.2:8080/") // Use this IP for Android Emulator
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
     val gameApi: GameApi = retrofit.create(GameApi::class.java)
     val authApi: AuthApi = retrofit.create(AuthApi::class.java)
+    val statsApi: StatsApi = retrofit.create(StatsApi::class.java)
 }
