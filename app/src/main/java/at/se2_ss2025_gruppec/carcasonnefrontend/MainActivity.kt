@@ -1,10 +1,15 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -85,6 +90,9 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import java.util.UUID
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -147,11 +155,23 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onPause() {
+        super.onPause()
+        SoundManager.pauseMusic()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        SoundManager.resumeMusic(this)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         SoundManager.stopMusic()
     }
 }
+
 @Composable
 fun GlobalSoundMenu() {
     var showVolumeControl by remember { mutableStateOf(false) }
@@ -268,7 +288,8 @@ fun LandingScreen(onStartTapped: () -> Unit) {
                 painter = painterResource(id = R.drawable.logo_pxart),
                 contentDescription = null,
                 modifier = Modifier
-                    .size(380.dp)
+                    .fillMaxWidth(0.95f)
+                    .aspectRatio(1f)
                     .offset(y = floating.dp), //Apply floating animation to logo
             )
 
@@ -305,13 +326,14 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 70.dp),
+                .padding(bottom = 60.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 OutlinedTextField( //Username input
+                    modifier = Modifier.fillMaxWidth(0.7f),
                     value = username,
                     onValueChange = { viewModel.username = it },
                     label = { Text("Username") },
@@ -329,6 +351,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField( //Password input
+                    modifier = Modifier.fillMaxWidth(0.7f),
                     value = password,
                     onValueChange = { viewModel.password = it },
                     label = { Text("Password") },
@@ -699,7 +722,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 270.dp),
+                .padding(top = 230.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Game ID block
@@ -709,7 +732,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                 colors = CardDefaults.cardColors(containerColor = Color(0x66000000)),
                 modifier = Modifier
                     .padding(bottom = 24.dp)
-                    .fillMaxWidth(0.6f)
+                    .fillMaxWidth(0.65f)
                     .height(70.dp)
             ) {
                 Row(
@@ -722,7 +745,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFFFF4C2)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     IconButton(onClick = {
                         clipboardManager.setText(AnnotatedString(gameId))
                         Toast.makeText(context, "Copied game ID!", Toast.LENGTH_SHORT).show()
@@ -915,7 +938,19 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            BottomScreenBar(viewModel, gameId)
+            BottomScreenBar(
+                viewModel = viewModel,
+                gameId = gameId,
+                phase = phase,
+                currentPlayerId = viewModel.currentPlayerId.value
+            )
+
+            CheatShakeListener(
+                enabled = playerName == viewModel.currentPlayerId.value,
+            ) {
+                viewModel.cheatRedraw(gameId)
+            }
+
             if (showEndGameDialog.value) {
                 ConfettiAnimation(visible = true)
 
@@ -1011,16 +1046,18 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 fun PlayerRow(viewModel: GameViewModel) {
     val players = viewModel.players
     val currentPlayerId by viewModel.currentPlayerId
-
     val context = LocalContext.current
 
-    Row(
+    LazyRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        players.forEachIndexed { idx, p ->
+        itemsIndexed(
+            items = players,
+            key = { _, player -> player.id }
+        ) { idx, p ->
             val isCurrent = p.id == currentPlayerId
 
             // 1) Meeple-Drawable-Name per Index
@@ -1030,6 +1067,7 @@ fun PlayerRow(viewModel: GameViewModel) {
                 2 -> "meeple_grn"
                 else -> "meeple_yel"
             }
+
             // 2) Ressource holen
             val resId = remember(meepleName) {
                 context.resources.getIdentifier(meepleName, "drawable", context.packageName)
@@ -1049,13 +1087,15 @@ fun PlayerRow(viewModel: GameViewModel) {
                     modifier = Modifier.size(35.dp)
                 )
 
+                Spacer(modifier = Modifier.height(1.dp))
+
                 Text(
                     text = p.id,
                     color = tint,
                     fontSize = 12.sp
                 )
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
 
                 Text(
                     text = "${p.score}P",
@@ -1138,9 +1178,11 @@ fun PannableTileGrid(
        ---------------------------------------------------------- */
     val tileSize = 100.dp
     val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
-    val context    = LocalContext.current
+    val context = LocalContext.current
+    val minScale = 0.5f
+    val maxScale = 3f
 
-    val scale   = remember { mutableFloatStateOf(1f) }
+    val scale = remember { mutableFloatStateOf(1f) }
     val offsetX = remember { mutableFloatStateOf(0f) }
     val offsetY = remember { mutableFloatStateOf(0f) }
     val imageCache = remember { mutableMapOf<String, ImageBitmap>() }
@@ -1152,7 +1194,9 @@ fun PannableTileGrid(
         /* ❶ Pan & Zoom – immer aktiv */
         .pointerInput(Unit) {
             detectTransformGestures { _, pan, zoom, _ ->
-                scale.floatValue   *= zoom
+                scale.floatValue = (scale.floatValue * zoom)
+                    .coerceIn(minScale, maxScale)
+                scale.floatValue *= zoom
                 offsetX.floatValue += pan.x
                 offsetY.floatValue += pan.y
             }
@@ -1251,7 +1295,7 @@ fun PannableTileGrid(
                 if (rid == 0) return@forEach
                 val dr = ContextCompat.getDrawable(context, rid) ?: return@forEach
 
-                val dstPx    = (scaledSize * 0.3f).toInt()         // 30 % der Kachel
+                val dstPx = (scaledSize * 0.3f).toInt()
                 val cacheKey = "${drawableName}_$dstPx"
 
                 val bmp = imageCache.getOrPut(cacheKey) {
@@ -1280,14 +1324,16 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
     return bitmap
 }
 
-
 @Composable
-fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
+fun BottomScreenBar(viewModel: GameViewModel, gameId: String, phase: GamePhase?, currentPlayerId: String?) {
     val context = LocalContext.current
     val tile = viewModel.currentTile.value
-    val players = viewModel.players
     val localPlayerId = TokenManager.loggedInUsername
-    val localPlayer = players.find { it.id == localPlayerId }
+    val players = viewModel.players
+
+    val canExpose by viewModel.canExpose.collectAsState()
+    val remainingMeeples by viewModel.remainingMeeples.collectAsState()
+    val isMeeplePlacementActive by viewModel.isMeeplePlacementActive.collectAsState()
 
     val idx = players.indexOfFirst { it.id == localPlayerId }
         .let { if (it >= 0) it.coerceIn(0..3) else 0 }
@@ -1314,10 +1360,6 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
         context.resources.getIdentifier(noMeepleDrawableName, "drawable", context.packageName)
     }
 
-    val remainingMeeples by viewModel.remainingMeeples.collectAsState()
-    val isMeeplePlacementActive = viewModel.isMeeplePlacementActive.collectAsState()
-    Log.d("MeeplePlacement", "UI State: ${isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1339,8 +1381,8 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                     painter = painterResource(id = meepleResId),
                     contentDescription = "Meeple setzen",
                     modifier = Modifier
-                        .size(if (isMeeplePlacementActive.value) 85.dp else 65.dp)
-                        .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive.value) }
+                        .size(if (isMeeplePlacementActive && localPlayerId == currentPlayerId) 85.dp else 65.dp)
+                        .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive) }
                 )
 
                 Box(
@@ -1360,15 +1402,34 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 }
             }
 
-            // Mitte: Das Tile-Bild bleibt exakt zentriert
-            Box(
-                modifier = Modifier.height(170.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                if (tile != null) {
-                    DrawTile(tile, viewModel)
-                } else {
-                    Spacer(modifier = Modifier.size(135.dp))
+            if (localPlayerId != currentPlayerId && phase != GamePhase.GAME_OVER) {
+                Button(
+                    onClick = { viewModel.exposeCheater(gameId) },
+                    enabled = canExpose,
+                    modifier = Modifier.size(135.dp),
+                    shape = RoundedCornerShape(13.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        if (canExpose) "Expose!" else "Disabled",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else {
+                // Mitte: Das Tile-Bild bleibt exakt zentriert
+                Box(
+                    modifier = Modifier.height(135.dp),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    if (tile != null) {
+                        DrawTile(tile, viewModel)
+                    } else {
+                        Spacer(modifier = Modifier.size(135.dp))
+                    }
                 }
             }
 
@@ -1402,7 +1463,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                             .padding(horizontal = 25.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "${localPlayer?.score ?: 0}P",
+                            text = "${players.find { it.id == localPlayerId }?.score ?: 0}P",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -1411,6 +1472,36 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun CheatShakeListener(enabled: Boolean, onShake: () -> Unit) {
+    val context = LocalContext.current
+    val sensorMgr = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+    val accelSensor = remember { sensorMgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
+    val lastTrigger = remember { mutableLongStateOf(0L) }
+    val threshold = 12f
+    val minInterval = 1500
+
+    DisposableEffect(enabled) {
+        if (!enabled) return@DisposableEffect onDispose { }
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(ev: SensorEvent) {
+                val gX = ev.values[0]; val gY = ev.values[1]; val gZ = ev.values[2]
+                val gForce = sqrt(gX*gX + gY*gY + gZ*gZ) - SensorManager.GRAVITY_EARTH
+                if (gForce > threshold) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastTrigger.longValue > minInterval) {
+                        lastTrigger.longValue = now
+                        onShake()
+                    }
+                }
+            }
+            override fun onAccuracyChanged(s: Sensor?, a: Int) {}
+        }
+        sensorMgr.registerListener(listener, accelSensor, SensorManager.SENSOR_DELAY_UI)
+        onDispose { sensorMgr.unregisterListener(listener) }
     }
 }
 

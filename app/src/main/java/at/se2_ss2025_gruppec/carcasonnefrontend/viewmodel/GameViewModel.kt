@@ -27,16 +27,15 @@ class GameViewModel : ViewModel() {
     fun setJoinedPlayer(name: String) { joinedPlayerName = name }
 
     private val _placedTiles = mutableStateListOf<Tile>()
-    val placedTiles: List<Tile> = _placedTiles
 
     private val _currentTile = mutableStateOf<Tile?>(null)
     val currentTile: State<Tile?> get() = _currentTile
 
-    private val _validPlacements = MutableStateFlow<List<Pair<Position,TileRotation>>>(emptyList())
-    val validPlacements: StateFlow<List<Pair<Position,TileRotation>>> = _validPlacements
-
     private val _deckRemaining = MutableStateFlow(0)
     val deckRemaining: StateFlow<Int> = _deckRemaining
+
+    private val _canExpose = MutableStateFlow(true)
+    val canExpose: StateFlow<Boolean> get() = _canExpose
 
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState
@@ -82,6 +81,16 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    fun cheatRedraw(gameId: String) {
+        joinedPlayerName?.let { webSocketClient.sendCheatRedraw(gameId, it) }
+    }
+
+    fun exposeCheater(gameId: String) {
+        if (_canExpose.value) {
+            webSocketClient.sendExposeCheater(gameId, joinedPlayerName!!)
+        }
+    }
+
     fun handleWebSocketMessage(msg: String) {
         try {
             val json = JSONObject(msg)
@@ -111,19 +120,37 @@ class GameViewModel : ViewModel() {
                     val tileJson = json.getJSONObject("tile")
                     val tile = parseTileFromJson(tileJson)
                     onTileDrawn(tile)
+                }
 
-                    if (json.has("validPlacements")) {
-                        val validPlacementsJson = json.getJSONArray("validPlacements")
-                        val validPlacementList = mutableListOf<Pair<Position,TileRotation>>()
-                        for (i in 0 until validPlacementsJson.length()) {
-                            val temp = validPlacementsJson.getJSONObject(i)
-                            val posObj = temp.getJSONObject("position")
-                            val position = Position(posObj.getInt("x"), posObj.getInt("y"))
-                            val rotation = TileRotation.valueOf(temp.getString("rotation"))
-                            validPlacementList += position to rotation
-                        }
-                        _validPlacements.value = validPlacementList
+                "CHEAT_TILE_DRAWN" -> {
+                    val tileJson = json.getJSONObject("tile")
+                    val tile = parseTileFromJson(tileJson)
+                    onTileDrawn(tile)
+
+                    viewModelScope.launch {
+                        _errorEvents.send("You cheated...")
                     }
+                }
+
+                "expose_success" -> {
+                    val culprit = json.getString("culprit")
+                    val accuser = json.getString("accuser")
+                    _canExpose.value = false
+                    updateGameWithScore(json)
+
+                    viewModelScope.launch {
+                        _errorEvents.send("$accuser exposed $culprit! –2 points")
+                    }
+                }
+
+                "expose_fail" -> {
+                    val accuser = json.getString("player")
+                    if (accuser == joinedPlayerName) {
+                        viewModelScope.launch {
+                            _errorEvents.send("False accusation! –1 point")
+                        }
+                    }
+                    updateGameWithScore(json)
                 }
 
                 "deck_update" -> {
@@ -172,14 +199,15 @@ class GameViewModel : ViewModel() {
 
                 "score_update" -> {
                     updateGameWithScore(json)
+                    setCurrentPlayerId(json.optString("nextPlayer"))
 
                     val phaseStr = json.optString("gamePhase", GamePhase.TILE_PLACEMENT.name)
                     val newPhase = GamePhase.valueOf(phaseStr)
 
                     _isMeeplePlacementActive.value = false
                     _currentTile.value = null
-                    _validPlacements.value = emptyList()
                     _currentPlayerId.value = json.getString("nextPlayer")
+                    _canExpose.value = true
 
                     val current = _uiState.value
                     if (current is GameUiState.Success) {
@@ -355,9 +383,8 @@ class GameViewModel : ViewModel() {
         _placedTiles.clear()
         _placedTiles.addAll(updatedBoard.values)
 
-        // Clear drawn tile and valid placements
+        // Clear drawn tile
         _currentTile.value  = null
-        _validPlacements.value = emptyList()
 
         Log.d("GameViewModel", "Board now has ${updatedBoard.size} placed tiles")
     }
@@ -483,9 +510,6 @@ class GameViewModel : ViewModel() {
                 )
             } ?: existing
         }
-
-        // Advance the UI to new current player
-        setCurrentPlayerId(json.optString("nextPlayer"))
     }
 }
 

@@ -18,10 +18,6 @@ object SoundManager {
     private const val KEY_VOLUME = "volume"
     private const val KEY_MUTED = "isMuted"
 
-    fun init(context: Context) {
-        loadPreferences(context)
-        playMusic(context, R.raw.lobby_music)
-    }
 
     fun playMusic(context: Context, musicResId: Int) {
         if (currentTrack == musicResId && mediaPlayer?.isPlaying == true) return
@@ -49,6 +45,12 @@ object SoundManager {
 
     fun pauseMusic() {
         mediaPlayer?.pause()
+    }
+
+    fun resumeMusic(context: Context) {
+        currentTrack?.let { resId ->
+            playMusic(context, resId)
+        }
     }
 
     fun setVolume(newVolume: Float) {
