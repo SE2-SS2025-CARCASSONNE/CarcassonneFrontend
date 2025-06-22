@@ -88,7 +88,6 @@ class GameViewModel : ViewModel() {
     fun exposeCheater(gameId: String) {
         if (_canExpose.value) {
             webSocketClient.sendExposeCheater(gameId, joinedPlayerName!!)
-            _canExpose.value = false
         }
     }
 
@@ -200,6 +199,7 @@ class GameViewModel : ViewModel() {
 
                 "score_update" -> {
                     updateGameWithScore(json)
+                    setCurrentPlayerId(json.optString("nextPlayer"))
 
                     val phaseStr = json.optString("gamePhase", GamePhase.TILE_PLACEMENT.name)
                     val newPhase = GamePhase.valueOf(phaseStr)
@@ -510,9 +510,6 @@ class GameViewModel : ViewModel() {
                 )
             } ?: existing
         }
-
-        // Advance the UI to new current player
-        setCurrentPlayerId(json.optString("nextPlayer"))
     }
 }
 

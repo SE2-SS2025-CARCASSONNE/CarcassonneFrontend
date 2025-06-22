@@ -331,6 +331,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 OutlinedTextField( //Username input
+                    modifier = Modifier.fillMaxWidth(0.7f),
                     value = username,
                     onValueChange = { viewModel.username = it },
                     label = { Text("Username") },
@@ -348,6 +349,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField( //Password input
+                    modifier = Modifier.fillMaxWidth(0.7f),
                     value = password,
                     onValueChange = { viewModel.password = it },
                     label = { Text("Password") },
@@ -728,7 +730,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                 colors = CardDefaults.cardColors(containerColor = Color(0x66000000)),
                 modifier = Modifier
                     .padding(bottom = 24.dp)
-                    .fillMaxWidth(0.6f)
+                    .fillMaxWidth(0.65f)
                     .height(70.dp)
             ) {
                 Row(
@@ -741,7 +743,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFFFF4C2)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     IconButton(onClick = {
                         clipboardManager.setText(AnnotatedString(gameId))
                         Toast.makeText(context, "Copied game ID!", Toast.LENGTH_SHORT).show()
@@ -1042,7 +1044,6 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 fun PlayerRow(viewModel: GameViewModel) {
     val players = viewModel.players
     val currentPlayerId by viewModel.currentPlayerId
-
     val context = LocalContext.current
 
     Row(
@@ -1288,7 +1289,7 @@ fun PannableTileGrid(
                 if (rid == 0) return@forEach
                 val dr = ContextCompat.getDrawable(context, rid) ?: return@forEach
 
-                val dstPx    = (scaledSize * 0.3f).toInt()         // 30 % der Kachel
+                val dstPx = (scaledSize * 0.3f).toInt()
                 val cacheKey = "${drawableName}_$dstPx"
 
                 val bmp = imageCache.getOrPut(cacheKey) {
@@ -1316,7 +1317,6 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
     drawable.draw(canvas)
     return bitmap
 }
-
 
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String, phase: GamePhase?, currentPlayerId: String?) {
@@ -1400,9 +1400,18 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String, phase: GamePhase?,
                 Button(
                     onClick = { viewModel.exposeCheater(gameId) },
                     enabled = canExpose,
-                    modifier = Modifier.size(135.dp)
+                    modifier = Modifier.size(135.dp),
+                    shape = RoundedCornerShape(13.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    )
                 ) {
-                    Text(if (canExpose) "Expose!" else "Disabled")
+                    Text(
+                        if (canExpose) "Expose!" else "Disabled",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             } else {
                 // Mitte: Das Tile-Bild bleibt exakt zentriert
