@@ -274,7 +274,8 @@ fun LandingScreen(onStartTapped: () -> Unit) {
                 painter = painterResource(id = R.drawable.logo_pxart),
                 contentDescription = null,
                 modifier = Modifier
-                    .size(380.dp)
+                    .fillMaxWidth(0.95f)
+                    .aspectRatio(1f)
                     .offset(y = floating.dp), //Apply floating animation to logo
             )
 
@@ -1067,13 +1068,15 @@ fun PlayerRow(viewModel: GameViewModel) {
                     modifier = Modifier.size(35.dp)
                 )
 
+                Spacer(modifier = Modifier.height(1.dp))
+
                 Text(
                     text = p.id,
                     color = tint,
                     fontSize = 12.sp
                 )
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
 
                 Text(
                     text = "${p.score}P",
@@ -1156,9 +1159,11 @@ fun PannableTileGrid(
        ---------------------------------------------------------- */
     val tileSize = 100.dp
     val tileSizePx = with(LocalDensity.current) { tileSize.toPx() }
-    val context    = LocalContext.current
+    val context = LocalContext.current
+    val minScale = 0.5f
+    val maxScale = 3f
 
-    val scale   = remember { mutableFloatStateOf(1f) }
+    val scale = remember { mutableFloatStateOf(1f) }
     val offsetX = remember { mutableFloatStateOf(0f) }
     val offsetY = remember { mutableFloatStateOf(0f) }
     val imageCache = remember { mutableMapOf<String, ImageBitmap>() }
@@ -1170,7 +1175,9 @@ fun PannableTileGrid(
         /* ❶ Pan & Zoom – immer aktiv */
         .pointerInput(Unit) {
             detectTransformGestures { _, pan, zoom, _ ->
-                scale.floatValue   *= zoom
+                scale.floatValue = (scale.floatValue * zoom)
+                    .coerceIn(minScale, maxScale)
+                scale.floatValue *= zoom
                 offsetX.floatValue += pan.x
                 offsetY.floatValue += pan.y
             }
@@ -1311,15 +1318,28 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String, phase: GamePhase?,
     val isMeeplePlacementActive by viewModel.isMeeplePlacementActive.collectAsState()
 
     val idx = players.indexOfFirst { it.id == localPlayerId }
-        .let { it.coerceIn(0..3) }
+        .let { if (it >= 0) it.coerceIn(0..3) else 0 }
 
-    val meepleResId = remember(idx) {
-        val name = listOf("meeple_blu","meeple_red","meeple_grn","meeple_yel")[idx]
-        context.resources.getIdentifier(name, "drawable", context.packageName)
+    val meepleDrawableName = when (idx) {
+        0 -> "meeple_blu"
+        1 -> "meeple_red"
+        2 -> "meeple_grn"
+        else -> "meeple_yel"
     }
+
+    val meepleResId = remember(meepleDrawableName) {
+        context.resources.getIdentifier(meepleDrawableName, "drawable", context.packageName)
+    }
+
+    val noMeepleDrawableName = when (idx) {
+        0 -> "nomeeple_blu"
+        1 -> "nomeeple_red"
+        2 -> "nomeeple_grn"
+        else -> "nomeeple_yel"
+    }
+
     val noMeepleResId = remember(idx) {
-        val name = listOf("nomeeple_blu","nomeeple_red","nomeeple_grn","nomeeple_yel")[idx]
-        context.resources.getIdentifier(name, "drawable", context.packageName)
+        context.resources.getIdentifier(noMeepleDrawableName, "drawable", context.packageName)
     }
 
     Box(
@@ -1343,8 +1363,8 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String, phase: GamePhase?,
                     painter = painterResource(id = meepleResId),
                     contentDescription = "Meeple setzen",
                     modifier = Modifier
-                        .size(if (isMeeplePlacementActive.value) 85.dp else 65.dp)
-                        .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive.value) }
+                        .size(if (isMeeplePlacementActive && localPlayerId == currentPlayerId) 85.dp else 65.dp)
+                        .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive) }
                 )
 
                 Box(
