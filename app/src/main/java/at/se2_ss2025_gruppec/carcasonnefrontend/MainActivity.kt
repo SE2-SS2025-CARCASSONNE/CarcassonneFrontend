@@ -1,10 +1,15 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -85,6 +90,7 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import java.util.UUID
 import androidx.compose.foundation.BorderStroke
+import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -699,7 +705,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 270.dp),
+                .padding(top = 250.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Game ID block
@@ -916,6 +922,15 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
             Spacer(modifier = Modifier.height(20.dp))
 
             BottomScreenBar(viewModel, gameId)
+
+            CheatShakeListener(
+                enabled = phase == GamePhase.TILE_PLACEMENT &&
+                        viewModel.currentTile.value != null &&
+                        playerName == viewModel.currentPlayerId.value,
+            ) {
+                viewModel.cheatRedraw(gameId)
+            }
+
             if (showEndGameDialog.value) {
                 ConfettiAnimation(visible = true)
 
@@ -1411,6 +1426,36 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun CheatShakeListener(enabled: Boolean, onShake: () -> Unit) {
+    val context = LocalContext.current
+    val sensorMgr = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+    val accelSensor = remember { sensorMgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
+    val lastTrigger = remember { mutableLongStateOf(0L) }
+    val threshold = 12f
+    val minInterval = 1500
+
+    DisposableEffect(enabled) {
+        if (!enabled) return@DisposableEffect onDispose { }
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(ev: SensorEvent) {
+                val gX = ev.values[0]; val gY = ev.values[1]; val gZ = ev.values[2]
+                val gForce = sqrt(gX*gX + gY*gY + gZ*gZ) - SensorManager.GRAVITY_EARTH
+                if (gForce > threshold) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastTrigger.longValue > minInterval) {
+                        lastTrigger.longValue = now
+                        onShake()
+                    }
+                }
+            }
+            override fun onAccuracyChanged(s: Sensor?, a: Int) {}
+        }
+        sensorMgr.registerListener(listener, accelSensor, SensorManager.SENSOR_DELAY_UI)
+        onDispose { sensorMgr.unregisterListener(listener) }
     }
 }
 

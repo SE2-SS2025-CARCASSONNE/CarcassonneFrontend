@@ -82,6 +82,10 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    fun cheatRedraw(gameId: String) {
+        joinedPlayerName?.let { webSocketClient.sendCheatRedraw(gameId, it) }
+    }
+
     fun handleWebSocketMessage(msg: String) {
         try {
             val json = JSONObject(msg)
@@ -123,6 +127,16 @@ class GameViewModel : ViewModel() {
                             validPlacementList += position to rotation
                         }
                         _validPlacements.value = validPlacementList
+                    }
+                }
+
+                "CHEAT_TILE_DRAWN" -> {
+                    val tileJson = json.getJSONObject("tile")
+                    val tile = parseTileFromJson(tileJson)
+                    onTileDrawn(tile)
+
+                    viewModelScope.launch {
+                        _errorEvents.send("You cheated...")
                     }
                 }
 
