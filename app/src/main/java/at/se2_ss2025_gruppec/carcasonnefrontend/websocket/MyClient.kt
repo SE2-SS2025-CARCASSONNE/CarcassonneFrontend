@@ -138,11 +138,22 @@ class MyClient(val callbacks: Callbacks) {
 
     fun sendCheatRedraw(gameId: String, playerId: String) {
         val json = JSONObject().apply {
-            put("type",   "CHEAT_REDRAW")
+            put("type", "CHEAT_REDRAW")
             put("gameId", gameId)
             put("player", playerId)
         }
         scope.launch { session?.sendText("/app/game/send", json.toString()) }
+    }
+
+    fun sendExposeCheater(gameId: String, playerId: String) {
+        val json = JSONObject().apply {
+            put("type", "EXPOSE_CHEATER")
+            put("gameId", gameId)
+            put("player", playerId)
+        }
+        scope.launch {
+            session?.sendText("/app/game/send", json.toString())
+        }
     }
 
     fun sendPlaceTileRequest(payload: String){

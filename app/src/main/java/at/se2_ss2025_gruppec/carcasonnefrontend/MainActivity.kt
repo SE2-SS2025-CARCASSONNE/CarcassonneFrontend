@@ -921,7 +921,12 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            BottomScreenBar(viewModel, gameId)
+            BottomScreenBar(
+                viewModel = viewModel,
+                gameId = gameId,
+                phase = phase,
+                currentPlayerId = viewModel.currentPlayerId.value
+            )
 
             CheatShakeListener(
                 enabled = playerName == viewModel.currentPlayerId.value,
@@ -1295,41 +1300,27 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
 
 
 @Composable
-fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
+fun BottomScreenBar(viewModel: GameViewModel, gameId: String, phase: GamePhase?, currentPlayerId: String?) {
     val context = LocalContext.current
     val tile = viewModel.currentTile.value
-    val players = viewModel.players
     val localPlayerId = TokenManager.loggedInUsername
-    val localPlayer = players.find { it.id == localPlayerId }
+    val players = viewModel.players
+
+    val canExpose by viewModel.canExpose.collectAsState()
+    val remainingMeeples by viewModel.remainingMeeples.collectAsState()
+    val isMeeplePlacementActive by viewModel.isMeeplePlacementActive.collectAsState()
 
     val idx = players.indexOfFirst { it.id == localPlayerId }
-        .let { if (it >= 0) it.coerceIn(0..3) else 0 }
+        .let { it.coerceIn(0..3) }
 
-    val meepleDrawableName = when (idx) {
-        0 -> "meeple_blu"
-        1 -> "meeple_red"
-        2 -> "meeple_grn"
-        else -> "meeple_yel"
+    val meepleResId = remember(idx) {
+        val name = listOf("meeple_blu","meeple_red","meeple_grn","meeple_yel")[idx]
+        context.resources.getIdentifier(name, "drawable", context.packageName)
     }
-
-    val meepleResId = remember(meepleDrawableName) {
-        context.resources.getIdentifier(meepleDrawableName, "drawable", context.packageName)
-    }
-
-    val noMeepleDrawableName = when (idx) {
-        0 -> "nomeeple_blu"
-        1 -> "nomeeple_red"
-        2 -> "nomeeple_grn"
-        else -> "nomeeple_yel"
-    }
-
     val noMeepleResId = remember(idx) {
-        context.resources.getIdentifier(noMeepleDrawableName, "drawable", context.packageName)
+        val name = listOf("nomeeple_blu","nomeeple_red","nomeeple_grn","nomeeple_yel")[idx]
+        context.resources.getIdentifier(name, "drawable", context.packageName)
     }
-
-    val remainingMeeples by viewModel.remainingMeeples.collectAsState()
-    val isMeeplePlacementActive = viewModel.isMeeplePlacementActive.collectAsState()
-    Log.d("MeeplePlacement", "UI State: ${isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
 
     Box(
         modifier = Modifier
@@ -1373,15 +1364,25 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 }
             }
 
-            // Mitte: Das Tile-Bild bleibt exakt zentriert
-            Box(
-                modifier = Modifier.height(170.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                if (tile != null) {
-                    DrawTile(tile, viewModel)
-                } else {
-                    Spacer(modifier = Modifier.size(135.dp))
+            if (localPlayerId != currentPlayerId && phase != GamePhase.GAME_OVER) {
+                Button(
+                    onClick = { viewModel.exposeCheater(gameId) },
+                    enabled = canExpose,
+                    modifier = Modifier.size(135.dp)
+                ) {
+                    Text(if (canExpose) "Expose!" else "Disabled")
+                }
+            } else {
+                // Mitte: Das Tile-Bild bleibt exakt zentriert
+                Box(
+                    modifier = Modifier.height(135.dp),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    if (tile != null) {
+                        DrawTile(tile, viewModel)
+                    } else {
+                        Spacer(modifier = Modifier.size(135.dp))
+                    }
                 }
             }
 
@@ -1415,7 +1416,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                             .padding(horizontal = 25.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "${localPlayer?.score ?: 0}P",
+                            text = "${players.find { it.id == localPlayerId }?.score ?: 0}P",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White

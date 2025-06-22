@@ -34,6 +34,9 @@ class GameViewModel : ViewModel() {
     private val _deckRemaining = MutableStateFlow(0)
     val deckRemaining: StateFlow<Int> = _deckRemaining
 
+    private val _canExpose = MutableStateFlow(true)
+    val canExpose: StateFlow<Boolean> get() = _canExpose
+
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState
 
@@ -82,6 +85,13 @@ class GameViewModel : ViewModel() {
         joinedPlayerName?.let { webSocketClient.sendCheatRedraw(gameId, it) }
     }
 
+    fun exposeCheater(gameId: String) {
+        if (_canExpose.value) {
+            webSocketClient.sendExposeCheater(gameId, joinedPlayerName!!)
+            _canExpose.value = false
+        }
+    }
+
     fun handleWebSocketMessage(msg: String) {
         try {
             val json = JSONObject(msg)
@@ -121,6 +131,27 @@ class GameViewModel : ViewModel() {
                     viewModelScope.launch {
                         _errorEvents.send("You cheated...")
                     }
+                }
+
+                "expose_success" -> {
+                    val culprit = json.getString("culprit")
+                    val accuser = json.getString("accuser")
+                    _canExpose.value = false
+                    updateGameWithScore(json)
+
+                    viewModelScope.launch {
+                        _errorEvents.send("$accuser exposed $culprit! –2 points")
+                    }
+                }
+
+                "expose_fail" -> {
+                    val accuser = json.getString("player")
+                    if (accuser == joinedPlayerName) {
+                        viewModelScope.launch {
+                            _errorEvents.send("False accusation! –1 point")
+                        }
+                    }
+                    updateGameWithScore(json)
                 }
 
                 "deck_update" -> {
@@ -176,6 +207,7 @@ class GameViewModel : ViewModel() {
                     _isMeeplePlacementActive.value = false
                     _currentTile.value = null
                     _currentPlayerId.value = json.getString("nextPlayer")
+                    _canExpose.value = true
 
                     val current = _uiState.value
                     if (current is GameUiState.Success) {
