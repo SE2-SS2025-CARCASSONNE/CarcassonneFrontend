@@ -153,11 +153,23 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onPause() {
+        super.onPause()
+        SoundManager.pauseMusic()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        SoundManager.resumeMusic(this)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         SoundManager.stopMusic()
     }
 }
+
 @Composable
 fun GlobalSoundMenu() {
     var showVolumeControl by remember { mutableStateOf(false) }
