@@ -90,6 +90,8 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import java.util.UUID
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
@@ -1046,13 +1048,16 @@ fun PlayerRow(viewModel: GameViewModel) {
     val currentPlayerId by viewModel.currentPlayerId
     val context = LocalContext.current
 
-    Row(
+    LazyRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        players.forEachIndexed { idx, p ->
+        itemsIndexed(
+            items = players,
+            key = { _, player -> player.id }
+        ) { idx, p ->
             val isCurrent = p.id == currentPlayerId
 
             // 1) Meeple-Drawable-Name per Index
@@ -1062,6 +1067,7 @@ fun PlayerRow(viewModel: GameViewModel) {
                 2 -> "meeple_grn"
                 else -> "meeple_yel"
             }
+
             // 2) Ressource holen
             val resId = remember(meepleName) {
                 context.resources.getIdentifier(meepleName, "drawable", context.packageName)
@@ -1409,7 +1415,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String, phase: GamePhase?,
                 ) {
                     Text(
                         if (canExpose) "Expose!" else "Disabled",
-                        fontSize = 18.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
