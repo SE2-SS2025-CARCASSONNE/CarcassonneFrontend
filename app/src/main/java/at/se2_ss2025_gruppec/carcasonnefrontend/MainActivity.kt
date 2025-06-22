@@ -311,7 +311,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 70.dp),
+                .padding(bottom = 60.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(
@@ -705,7 +705,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 250.dp),
+                .padding(top = 230.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Game ID block
@@ -924,9 +924,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
             BottomScreenBar(viewModel, gameId)
 
             CheatShakeListener(
-                enabled = phase == GamePhase.TILE_PLACEMENT &&
-                        viewModel.currentTile.value != null &&
-                        playerName == viewModel.currentPlayerId.value,
+                enabled = playerName == viewModel.currentPlayerId.value,
             ) {
                 viewModel.cheatRedraw(gameId)
             }

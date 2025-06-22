@@ -27,13 +27,9 @@ class GameViewModel : ViewModel() {
     fun setJoinedPlayer(name: String) { joinedPlayerName = name }
 
     private val _placedTiles = mutableStateListOf<Tile>()
-    val placedTiles: List<Tile> = _placedTiles
 
     private val _currentTile = mutableStateOf<Tile?>(null)
     val currentTile: State<Tile?> get() = _currentTile
-
-    private val _validPlacements = MutableStateFlow<List<Pair<Position,TileRotation>>>(emptyList())
-    val validPlacements: StateFlow<List<Pair<Position,TileRotation>>> = _validPlacements
 
     private val _deckRemaining = MutableStateFlow(0)
     val deckRemaining: StateFlow<Int> = _deckRemaining
@@ -115,19 +111,6 @@ class GameViewModel : ViewModel() {
                     val tileJson = json.getJSONObject("tile")
                     val tile = parseTileFromJson(tileJson)
                     onTileDrawn(tile)
-
-                    if (json.has("validPlacements")) {
-                        val validPlacementsJson = json.getJSONArray("validPlacements")
-                        val validPlacementList = mutableListOf<Pair<Position,TileRotation>>()
-                        for (i in 0 until validPlacementsJson.length()) {
-                            val temp = validPlacementsJson.getJSONObject(i)
-                            val posObj = temp.getJSONObject("position")
-                            val position = Position(posObj.getInt("x"), posObj.getInt("y"))
-                            val rotation = TileRotation.valueOf(temp.getString("rotation"))
-                            validPlacementList += position to rotation
-                        }
-                        _validPlacements.value = validPlacementList
-                    }
                 }
 
                 "CHEAT_TILE_DRAWN" -> {
@@ -192,7 +175,6 @@ class GameViewModel : ViewModel() {
 
                     _isMeeplePlacementActive.value = false
                     _currentTile.value = null
-                    _validPlacements.value = emptyList()
                     _currentPlayerId.value = json.getString("nextPlayer")
 
                     val current = _uiState.value
@@ -369,9 +351,8 @@ class GameViewModel : ViewModel() {
         _placedTiles.clear()
         _placedTiles.addAll(updatedBoard.values)
 
-        // Clear drawn tile and valid placements
+        // Clear drawn tile
         _currentTile.value  = null
-        _validPlacements.value = emptyList()
 
         Log.d("GameViewModel", "Board now has ${updatedBoard.size} placed tiles")
     }
