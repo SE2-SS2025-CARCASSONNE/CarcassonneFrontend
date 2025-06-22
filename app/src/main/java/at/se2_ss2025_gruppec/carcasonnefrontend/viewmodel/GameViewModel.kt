@@ -290,6 +290,7 @@ class GameViewModel : ViewModel() {
             right = json.getString("terrainEast"),
             bottom = json.getString("terrainSouth"),
             left = json.getString("terrainWest"),
+            center = json.getString("terrainCenter"),
             hasMonastery = json.optBoolean("hasMonastery", false),
             hasShield = json.optBoolean("hasShield", false),
             tileRotation = TileRotation.valueOf(json.optString("tileRotation", "NORTH"))
@@ -384,6 +385,7 @@ class GameViewModel : ViewModel() {
                 put("terrainEast", tile.right)
                 put("terrainSouth", tile.bottom)
                 put("terrainWest", tile.left)
+                put("terrainCenter", tile.center)
                 put("tileRotation", tile.tileRotation)
                 put("hasMonastery", tile.hasMonastery)
                 put("hasShield", tile.hasShield)

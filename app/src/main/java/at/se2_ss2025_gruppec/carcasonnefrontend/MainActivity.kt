@@ -1,6 +1,7 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.annotation.SuppressLint
+import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -10,6 +11,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -87,6 +89,7 @@ import androidx.compose.foundation.BorderStroke
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         SoundManager.playMusic(this, R.raw.lobby_music)
 
         setContent {
@@ -106,16 +109,12 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(navController = navController, startDestination = "landing") {
                     composable("landing") { LandingScreen(onStartTapped = {
-                        navController.navigate("auth") {
-                            popUpTo("landing") { inclusive = true }
-                        }
+                        navController.navigate("auth")
                     })}
                     composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
                         TokenManager.userToken = jwtToken
                         userToken = jwtToken
-                        navController.navigate("main") {
-                            popUpTo("auth") { inclusive = true }
-                        }
+                        navController.navigate("main")
                     })}
                     composable("main") { MainScreen(navController) }
                     composable("join_game") { JoinGameScreen(navController) }
@@ -290,9 +289,9 @@ fun LandingScreen(onStartTapped: () -> Unit) {
 fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    var username = viewModel.username
-    var password = viewModel.password
-    var isLoading = viewModel.isLoading
+    val username = viewModel.username
+    val password = viewModel.password
+    val isLoading = viewModel.isLoading
 
     LaunchedEffect(true) {
         viewModel.uiEvents.collect { message -> // Collect messages from ViewModel
@@ -306,7 +305,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 100.dp),
+                .padding(bottom = 70.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(
@@ -376,6 +375,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
 
 @Composable
 fun MainScreen(navController: NavController) {
+    BackHandler(enabled = true) {}
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -388,7 +388,7 @@ fun MainScreen(navController: NavController) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 320.dp),
+                .padding(bottom = 170.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -480,6 +480,7 @@ fun MainScreen(navController: NavController) {
         }
     }
 }
+
 @Composable
 fun StatLine(label: String, value: String) {
     Row(
@@ -492,6 +493,7 @@ fun StatLine(label: String, value: String) {
         Text(text = value, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
+
 @Composable
 fun JoinGameScreen(navController: NavController = rememberNavController()) {
     val context = LocalContext.current
@@ -504,7 +506,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 285.dp),
+                .padding(bottom = 250.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -539,13 +541,13 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                     label = "Join",
                     onClick = {
                         if (gameId.isBlank()) {
-                            Toast.makeText(context, "Please enter a game ID", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Please enter a game ID!", Toast.LENGTH_SHORT).show()
                             return@PixelArtButton
                         }
 
                         val username = TokenManager.loggedInUsername
                         if (username.isNullOrBlank()) {
-                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "No user logged in!", Toast.LENGTH_SHORT).show()
                             return@PixelArtButton
                         }
 
@@ -554,7 +556,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                                 val token = TokenManager.userToken
                                     ?: throw IllegalStateException("Token is required, but was null!")
 
-                                val gameState = gameApi.getGame(
+                                gameApi.getGame(
                                     token = "Bearer $token",
                                     gameId = gameId
                                 )
@@ -583,7 +585,7 @@ fun CreateGameScreen(navController: NavController) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 320.dp),
+                .padding(bottom = 250.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -613,14 +615,12 @@ fun CreateGameScreen(navController: NavController) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(50.dp))
 
                 PixelArtButton(
                     label = "Create",
                     onClick = {
-                        val hostName = TokenManager.loggedInUsername ?: return@PixelArtButton.also {
-                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
-                        }
+                        val hostName = TokenManager.loggedInUsername ?: return@PixelArtButton
 
                         coroutineScope.launch {
                             try {
@@ -630,7 +630,7 @@ fun CreateGameScreen(navController: NavController) {
                                     token = "Bearer $token",
                                     request = CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
-                                Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, "Game created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
                                 navController.navigate("lobby/${response.gameId}")
 
                             } catch (e: Exception) {
@@ -696,19 +696,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         BackgroundImage()
 
-        PixelArtTitle(
-            title = "Game Lobby",
-            backgroundRes = R.drawable.bg_pxart,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 54.dp)
-                .align(Alignment.TopCenter)
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 228.dp),
+                .padding(top = 270.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Game ID block
@@ -734,7 +725,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
                     Spacer(modifier = Modifier.width(12.dp))
                     IconButton(onClick = {
                         clipboardManager.setText(AnnotatedString(gameId))
-                        Toast.makeText(context, "Copied Game ID", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Copied game ID!", Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
@@ -782,11 +773,10 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 
             Spacer(modifier = Modifier.height(56.dp))
 
-            if (hostName.value == playerName) {
+            if (hostName.value == playerName && players.size > 1) {
                 PixelArtButton(
                     label = "Start Game",
                     onClick = {
-                        Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
                         stompClient.sendStartGame(gameId, playerName)
                     }
                 )
@@ -798,6 +788,7 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
+    BackHandler(enabled = true) {}
     val context = LocalContext.current
     val showEndGameDialog = remember { mutableStateOf(false) }
     val winner = remember { mutableStateOf("") }
@@ -854,17 +845,16 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
     val tileMode   = phase == GamePhase.TILE_PLACEMENT
     val meepleMode = phase == GamePhase.MEEPLE_PLACEMENT
-    val scoring    = phase == GamePhase.SCORING
 
     Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
 
         Column(modifier = Modifier.fillMaxSize()) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(35.dp))
 
             PlayerRow(viewModel)
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             TileBackRow(viewModel, gameId, playerName)
 
@@ -873,8 +863,8 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
             if (uiState is GameUiState.Success) {
                 val gameState = (uiState as GameUiState.Success).gameState
                 val placedTiles = gameState.board.values.toList()
-                val meeples     = gameState.meeples
-                val players = viewModel.players                 // val players = gameState.players
+                val meeples = gameState.meeples
+                val players = viewModel.players
 
                 PannableTileGrid(
                     tiles = placedTiles,
@@ -1036,9 +1026,9 @@ fun PlayerRow(viewModel: GameViewModel) {
             // 1) Meeple-Drawable-Name per Index
             val meepleName = when (idx.coerceIn(0..3)) {
                 0 -> "meeple_blu"
-                1 -> "meeple_yel"
-                2 -> "meeple_red"
-                else -> "meeple_grn"
+                1 -> "meeple_red"
+                2 -> "meeple_grn"
+                else -> "meeple_yel"
             }
             // 2) Ressource holen
             val resId = remember(meepleName) {
@@ -1056,20 +1046,23 @@ fun PlayerRow(viewModel: GameViewModel) {
                 Image(
                     painter = painterResource(id = resId),
                     contentDescription = "Meeple von ${p.id}",
-                    modifier = Modifier
-                        .size(if (isCurrent) 36.dp else 30.dp)
+                    modifier = Modifier.size(35.dp)
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+
                 Text(
                     text = p.id,
                     color = tint,
                     fontSize = 12.sp
                 )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
                 Text(
                     text = "${p.score}P",
                     color = Color.LightGray,
                     fontSize = 11.sp
                 )
+
             }
         }
     }
@@ -1249,9 +1242,9 @@ fun PannableTileGrid(
 
                 val drawableName = when (idx) {
                     0 -> "meeple_blu"
-                    1 -> "meeple_yel"
-                    2 -> "meeple_red"
-                    else -> "meeple_grn"
+                    1 -> "meeple_red"
+                    2 -> "meeple_grn"
+                    else -> "meeple_yel"
                 }
 
                 val rid = context.resources.getIdentifier(drawableName, "drawable", context.packageName)
@@ -1291,7 +1284,7 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
     val context = LocalContext.current
-    val tile = viewModel.currentTile.value //TODO: Mike oder doch collectAsState?
+    val tile = viewModel.currentTile.value
     val players = viewModel.players
     val localPlayerId = TokenManager.loggedInUsername
     val localPlayer = players.find { it.id == localPlayerId }
@@ -1301,9 +1294,9 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
 
     val meepleDrawableName = when (idx) {
         0 -> "meeple_blu"
-        1 -> "meeple_yel"
-        2 -> "meeple_red"
-        else -> "meeple_grn"
+        1 -> "meeple_red"
+        2 -> "meeple_grn"
+        else -> "meeple_yel"
     }
 
     val meepleResId = remember(meepleDrawableName) {
@@ -1312,9 +1305,9 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
 
     val noMeepleDrawableName = when (idx) {
         0 -> "nomeeple_blu"
-        1 -> "nomeeple_yel"
-        2 -> "nomeeple_red"
-        else -> "nomeeple_grn"
+        1 -> "nomeeple_red"
+        2 -> "nomeeple_grn"
+        else -> "nomeeple_yel"
     }
 
     val noMeepleResId = remember(idx) {
@@ -1350,12 +1343,21 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                         .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive.value) }
                 )
 
-                Text(
-                    text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 7}",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = Color.Black,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 7}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
             }
 
             // Mitte: Das Tile-Bild bleibt exakt zentriert
@@ -1394,7 +1396,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                     Box(
                         modifier = Modifier
                             .background(
-                                color = Color.White,
+                                color = Color.Black,
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(horizontal = 25.dp, vertical = 3.dp)
@@ -1403,7 +1405,7 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                             text = "${localPlayer?.score ?: 0}P",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            color = Color.White
                         )
                     }
                 }
@@ -1507,34 +1509,6 @@ fun DrawTile(tile: Tile, viewModel: GameViewModel) {
     }
 }
 
-@Composable
-fun PixelArtTitle(
-    modifier: Modifier = Modifier,
-    title: String,
-    backgroundRes: Int = R.drawable.bg_pxart
-) {
-    Box(
-        modifier = modifier
-            .width(260.dp)
-            .height(80.dp)
-    ) {
-        Image(
-            painter = painterResource(id = backgroundRes),
-            contentDescription = "Lobby Title Background",
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier.matchParentSize()
-        )
-        Text(
-            text = title,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 2.sp,
-            color = Color(0xFFFFF4C2),
-            fontFamily = FontFamily.Serif,
-            modifier = Modifier.align(Alignment.Center)
-        )
-    }
-}
 @Composable
 fun ConfettiAnimation(
     visible: Boolean,
