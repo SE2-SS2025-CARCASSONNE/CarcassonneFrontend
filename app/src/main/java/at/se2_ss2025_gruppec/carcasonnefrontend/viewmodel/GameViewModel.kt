@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameState
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
@@ -13,30 +14,17 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONObject
-
-fun Tile.topColor(): Color = directionToColor(this.top)
-fun Tile.rightColor(): Color = directionToColor(this.right)
-fun Tile.bottomColor(): Color = directionToColor(this.bottom)
-fun Tile.leftColor(): Color = directionToColor(this.left)
-
-fun directionToColor(type: String): Color = when (type) {
-    "ROAD" -> Color.Yellow
-    "CITY" -> Color.Red
-    "MONASTERY" -> Color.Blue
-    "FIELD" -> Color.Green
-    else -> Color.Gray
-}
 
 class GameViewModel : ViewModel() {
 
     private var joinedPlayerName: String? = null
     fun setJoinedPlayer(name: String) { joinedPlayerName = name }
-
-    private val _tileDeck = mutableStateListOf<Tile>()
-    val tileDeck: List<Tile> = _tileDeck
 
     private val _placedTiles = mutableStateListOf<Tile>()
     val placedTiles: List<Tile> = _placedTiles
@@ -65,10 +53,13 @@ class GameViewModel : ViewModel() {
     private val _remainingMeeples = MutableStateFlow(mapOf<String, Int>())
     val remainingMeeples: StateFlow<Map<String, Int>> get() = _remainingMeeples
 
+    // 1A) Channel für Error-Events vom WebSocket
+    private val _errorEvents = Channel<String>(Channel.BUFFERED)
+    val errorEvents = _errorEvents.receiveAsFlow()
+
 
     fun setMeeplePlacement(active: Boolean) {
         _isMeeplePlacementActive.value = active
-        Log.d("MeeplePlacement", "Meeple Placement Active: ${_isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
     }
 
     fun updateRemainingMeeples(playerId: String, meepleCount: Int) {
@@ -83,22 +74,6 @@ class GameViewModel : ViewModel() {
         webSocketClient = client
     }
 
-    fun joinGame(gameId: String, playerName: String) {
-        webSocketClient.sendJoinGame(gameId, playerName)
-    }
-
-    fun subscribeToGame(gameId: String) {
-        webSocketClient.listenOn("/topic/game/$gameId") { msg ->
-            handleWebSocketMessage(msg)
-        }
-    }
-
-    fun subscribeToPrivate() {
-        webSocketClient.listenOn("/user/queue/private") { msg ->
-            handleWebSocketMessage(msg)
-        }
-    }
-
     fun requestTileFromBackend(gameId: String, playerId: String) {
         if (webSocketClient.isConnected()) {
             webSocketClient.sendDrawTileRequest(gameId, playerId)
@@ -107,7 +82,7 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    private fun handleWebSocketMessage(msg: String) {
+    fun handleWebSocketMessage(msg: String) {
         try {
             val json = JSONObject(msg)
             val type = json.getString("type")
@@ -115,13 +90,16 @@ class GameViewModel : ViewModel() {
             when (type) {
                 "player_joined" -> {
                     val arr = json.getJSONArray("players")
+
+                    val colors = listOf(Color.Blue, Color.Yellow, Color.Red, Color.Green)
+
                     val newPlayers = (0 until arr.length()).map { i ->
                         Player(
                             id = arr.getString(i),
                             name = arr.getString(i),
                             score = 0,
                             availableMeeples = 7,
-                            color = Color.Green
+                            color = colors.getOrElse(i) { Color.Gray }
                         )
                     }
                     _players.clear()
@@ -197,21 +175,37 @@ class GameViewModel : ViewModel() {
 
                     val phaseStr = json.optString("gamePhase", GamePhase.TILE_PLACEMENT.name)
                     val newPhase = GamePhase.valueOf(phaseStr)
-                    val current = _uiState.value
-                    if (current is GameUiState.Success) {
-                        _uiState.value = GameUiState.Success(
-                            current.gameState.copy(gamePhase = newPhase)
-                        )
-                    }
+
                     _isMeeplePlacementActive.value = false
                     _currentTile.value = null
                     _validPlacements.value = emptyList()
                     _currentPlayerId.value = json.getString("nextPlayer")
+
+                    val current = _uiState.value
+                    if (current is GameUiState.Success) {
+                        _uiState.value = GameUiState.Success(
+                            current.gameState.copy(
+                                gamePhase = newPhase)
+                        )
+                    }
+
+                    val scoresArr = json.getJSONArray("scores")
+                    for (i in 0 until scoresArr.length()) {
+                        val entry = scoresArr.getJSONObject(i)
+                        val playerId = entry.getString("player")
+                        val remaining = entry.getInt("remainingMeeple")
+                        updateRemainingMeeples(playerId, remaining)
+                    }
                 }
 
                 "error" -> {
                     val message = json.getString("message")
                     Log.e("WebSocket", "Error from server: $message")
+
+                    // Fehlermeldung in den Channel senden
+                    viewModelScope.launch {
+                        _errorEvents.send(message)
+                    }
 
                     if (message.contains("no more playable tiles", ignoreCase = true)) {
                         clearCurrentTile()
@@ -261,6 +255,20 @@ class GameViewModel : ViewModel() {
                     }
                 }
 
+                "meeple_removed" -> {
+                    val ids = json.getJSONArray("ids").let { arr ->
+                            List(arr.length()) { i -> arr.getString(i) }
+                        }
+
+                    (_uiState.value as? GameUiState.Success)?.let { success ->
+                        val meeplesOnBoard = success.gameState.meeples
+                            .filterNot { it.id in ids }
+                        _uiState.value = GameUiState.Success(
+                            success.gameState.copy(meeples = meeplesOnBoard)
+                        )
+                    }
+                }
+
                 else -> {
                     Log.d("WebSocket", "Unhandled message type: $type")
                 }
@@ -282,79 +290,11 @@ class GameViewModel : ViewModel() {
             right = json.getString("terrainEast"),
             bottom = json.getString("terrainSouth"),
             left = json.getString("terrainWest"),
+            center = json.getString("terrainCenter"),
             hasMonastery = json.optBoolean("hasMonastery", false),
             hasShield = json.optBoolean("hasShield", false),
             tileRotation = TileRotation.valueOf(json.optString("tileRotation", "NORTH"))
         )
-    }
-
-    fun tileCountFor(id: String): Int = when (id) {
-        "tile-a" -> 2
-        "tile-b" -> 4
-        "tile-c" -> 1
-        "tile-d" -> 4
-        "tile-e" -> 5
-        "tile-f" -> 2
-        "tile-g" -> 1
-        "tile-h" -> 3
-        "tile-i" -> 2
-        "tile-j" -> 3
-        "tile-k" -> 3
-        "tile-m" -> 3
-        "tile-n" -> 3
-        "tile-o" -> 2
-        "tile-p" -> 2
-        "tile-q" -> 3
-        "tile-r" -> 1
-        "tile-s" -> 3
-        "tile-t" -> 2
-        "tile-u" -> 1
-        "tile-v" -> 8
-        "tile-w" -> 9
-        "tile-x" -> 4
-        "tile-y" -> 1
-        else -> 1
-    }
-
-    fun createShuffledDeck() {
-        val baseTiles = listOf(
-            Tile("tile-a", "FIELD", "FIELD", "ROAD", "FIELD", hasMonastery = true),
-            Tile("tile-b", "FIELD", "FIELD", "FIELD", "FIELD", hasMonastery = true),
-            Tile("tile-c", "CITY", "CITY", "CITY", "CITY", hasShield = true),
-            Tile("tile-d", "CITY", "ROAD", "FIELD", "ROAD"),
-            Tile("tile-e", "CITY", "FIELD", "FIELD", "FIELD", hasShield = true),
-            Tile("tile-f", "FIELD", "CITY", "FIELD", "CITY", hasShield = true),
-            Tile("tile-g", "FIELD", "CITY", "FIELD", "CITY"),
-            Tile("tile-h", "CITY", "FIELD", "CITY", "FIELD"),
-            Tile("tile-i", "CITY", "FIELD", "FIELD", "CITY"),
-            Tile("tile-j", "CITY", "ROAD", "ROAD", "FIELD"),
-            Tile("tile-k", "CITY", "FIELD", "ROAD", "ROAD"),
-            Tile("tile-m", "CITY", "ROAD", "ROAD", "ROAD"),
-            Tile("tile-n", "CITY", "CITY", "FIELD", "FIELD"),
-            Tile("tile-o", "CITY", "CITY", "FIELD", "FIELD", hasShield = true),
-            Tile("tile-p", "CITY", "ROAD", "ROAD", "CITY", hasShield = true),
-            Tile("tile-q", "CITY", "ROAD", "ROAD", "CITY"),
-            Tile("tile-r", "CITY", "CITY", "FIELD", "CITY", hasShield = true),
-            Tile("tile-s", "CITY", "CITY", "FIELD", "CITY"),
-            Tile("tile-t", "CITY", "CITY", "ROAD", "CITY", hasShield = true),
-            Tile("tile-u", "CITY", "CITY", "ROAD", "CITY"),
-            Tile("tile-v", "ROAD", "FIELD", "ROAD", "FIELD"),
-            Tile("tile-w", "FIELD", "FIELD", "ROAD", "ROAD"),
-            Tile("tile-x", "FIELD", "ROAD", "ROAD", "ROAD"),
-            Tile("tile-y", "ROAD", "ROAD", "ROAD", "ROAD")
-        )
-
-        val fullDeck = baseTiles.flatMap { tile ->
-            List(tileCountFor(tile.id)) { index -> tile.copy(id = "${tile.id}-$index") }
-        }
-
-        _tileDeck.clear()
-        _tileDeck.addAll(fullDeck.shuffled())
-    }
-
-    fun drawNextTile() {
-        _currentTile.value = if (_tileDeck.isNotEmpty()) _tileDeck.removeAt(0) else null
-        println("Drawn tile: ${_currentTile.value}")
     }
 
     fun Tile.rotateClockwise(): Tile {
@@ -445,6 +385,7 @@ class GameViewModel : ViewModel() {
                 put("terrainEast", tile.right)
                 put("terrainSouth", tile.bottom)
                 put("terrainWest", tile.left)
+                put("terrainCenter", tile.center)
                 put("tileRotation", tile.tileRotation)
                 put("hasMonastery", tile.hasMonastery)
                 put("hasShield", tile.hasShield)

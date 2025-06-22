@@ -1,6 +1,7 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.annotation.SuppressLint
+import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -10,12 +11,12 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -23,7 +24,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -47,9 +46,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.compose.ui.graphics.Brush
 import androidx.navigation.compose.NavHost
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.navigation.compose.composable
@@ -67,6 +66,12 @@ import kotlinx.coroutines.delay
 import org.json.JSONObject
 import androidx.compose.ui.unit.IntSize
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.*
+import androidx.compose.foundation.shape.CircleShape
+import kotlin.random.Random
+import androidx.compose.foundation.layout.offset
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.UserStatsDto
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
@@ -74,19 +79,17 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.GameUiState
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.bottomColor
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.leftColor
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.rightColor
-import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.topColor
 import kotlin.math.floor
 import androidx.core.graphics.createBitmap
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.GamePhase
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import java.util.UUID
+import androidx.compose.foundation.BorderStroke
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         SoundManager.playMusic(this, R.raw.lobby_music)
 
         setContent {
@@ -106,16 +109,12 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(navController = navController, startDestination = "landing") {
                     composable("landing") { LandingScreen(onStartTapped = {
-                        navController.navigate("auth") {
-                            popUpTo("landing") { inclusive = true }
-                        }
+                        navController.navigate("auth")
                     })}
                     composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
                         TokenManager.userToken = jwtToken
                         userToken = jwtToken
-                        navController.navigate("main") {
-                            popUpTo("auth") { inclusive = true }
-                        }
+                        navController.navigate("main")
                     })}
                     composable("main") { MainScreen(navController) }
                     composable("join_game") { JoinGameScreen(navController) }
@@ -156,11 +155,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GlobalSoundMenu() {
     var showVolumeControl by remember { mutableStateOf(false) }
-    var volumeLevel by remember { mutableStateOf(0.5f) }
-    var isMuted by remember { mutableStateOf(false) }
+    var volumeLevel by remember { mutableStateOf(SoundManager.volume) }
+    var isMuted by remember { mutableStateOf(SoundManager.isMuted) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Top-right floating gear icon
         IconButton(
             onClick = { showVolumeControl = !showVolumeControl },
             modifier = Modifier
@@ -176,15 +174,13 @@ fun GlobalSoundMenu() {
         }
 
         if (showVolumeControl) {
-            // Transparent full-screen dismiss layer
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Transparent)
-                    .clickable { showVolumeControl = false } // click outside = close
+                    .clickable { showVolumeControl = false }
             )
 
-            // Settings popup on top
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -214,7 +210,7 @@ fun GlobalSoundMenu() {
                         Button(
                             onClick = {
                                 isMuted = true
-                                SoundManager.setVolume(0f)
+                                SoundManager.mute()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A4A2A))
                         ) {
@@ -223,7 +219,7 @@ fun GlobalSoundMenu() {
                         Button(
                             onClick = {
                                 isMuted = false
-                                SoundManager.setVolume(volumeLevel)
+                                SoundManager.unmute()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A4A2A))
                         ) {
@@ -288,34 +284,14 @@ fun LandingScreen(onStartTapped: () -> Unit) {
         }
     }
 }
-@Composable
-fun TileView(tile: Tile) {
-    Box(
-        modifier = Modifier
-            .size(64.dp)
-            .border(2.dp, Color.White)
-            .drawBehind {
-                val width = size.width
-                val height = size.height
-                val edge = 10f
-
-                drawRect(color = tile.topColor(), topLeft = Offset(0f, 0f), size = Size(width, edge))
-                drawRect(color = tile.rightColor(), topLeft = Offset(width - edge, 0f), size = Size(edge, height))
-                drawRect(color = tile.bottomColor(), topLeft = Offset(0f, height - edge), size = Size(width, edge))
-                drawRect(color = tile.leftColor(), topLeft = Offset(0f, 0f), size = Size(edge, height))
-
-                drawCircle(Color.Black, radius = 4f, center = Offset(width / 2, height / 2))
-            }
-    )
-}
 
 @Composable
 fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    var username = viewModel.username
-    var password = viewModel.password
-    var isLoading = viewModel.isLoading
+    val username = viewModel.username
+    val password = viewModel.password
+    val isLoading = viewModel.isLoading
 
     LaunchedEffect(true) {
         viewModel.uiEvents.collect { message -> // Collect messages from ViewModel
@@ -329,7 +305,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 100.dp),
+                .padding(bottom = 70.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(
@@ -399,13 +375,20 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
 
 @Composable
 fun MainScreen(navController: NavController) {
+    BackHandler(enabled = true) {}
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var showStatsPopup by remember { mutableStateOf(false) }
+    var stats by remember { mutableStateOf<UserStatsDto?>(null) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 320.dp),
+                .padding(bottom = 170.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -416,14 +399,98 @@ fun MainScreen(navController: NavController) {
                     }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
+
                 PixelArtButton(
                     label = "Create Game",
                     onClick = {
                         navController.navigate("create_game")
                     }
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                PixelArtButton(
+                    label = "Statistics",
+                    onClick = {
+                        showStatsPopup = true
+                        coroutineScope.launch {
+                            try {
+                                val token = TokenManager.userToken
+                                if (token != null) {
+                                    val bearer = "Bearer $token"
+                                    val result = ApiClient.statsApi.getUserStats(bearer)
+                                    stats = result
+                                } else {
+                                    Toast.makeText(context, "Not logged in", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to load stats", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                )
             }
         }
+
+        if (showStatsPopup) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable { showStatsPopup = false }
+            ) {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                        .widthIn(max = 280.dp) // Adjusted width
+                        .clickable(enabled = false) {}, // Prevents background click passing
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2E3A59))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Player Statistics",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        stats?.let {
+                            StatLine(label = "Games Played", value = it.totalGames.toString())
+                            StatLine(label = "Games Won", value = it.totalWins.toString())
+                            StatLine(label = "Win Ratio", value = "${(it.winRatio * 100).toInt()}%")
+                            StatLine(label = "High Score", value = it.highScore.toString())
+                        } ?: Text("Loading...", color = Color.White)
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Tap anywhere to dismiss",
+                            fontSize = 12.sp,
+                            color = Color.LightGray,
+                            modifier = Modifier.graphicsLayer(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatLine(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, color = Color.White, fontSize = 16.sp)
+        Text(text = value, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -439,7 +506,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 285.dp),
+                .padding(bottom = 250.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -474,13 +541,13 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                     label = "Join",
                     onClick = {
                         if (gameId.isBlank()) {
-                            Toast.makeText(context, "Please enter a game ID", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Please enter a game ID!", Toast.LENGTH_SHORT).show()
                             return@PixelArtButton
                         }
 
                         val username = TokenManager.loggedInUsername
                         if (username.isNullOrBlank()) {
-                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "No user logged in!", Toast.LENGTH_SHORT).show()
                             return@PixelArtButton
                         }
 
@@ -489,11 +556,10 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
                                 val token = TokenManager.userToken
                                     ?: throw IllegalStateException("Token is required, but was null!")
 
-                                val gameState = gameApi.getGame(
+                                gameApi.getGame(
                                     token = "Bearer $token",
                                     gameId = gameId
                                 )
-                                val playerCount = gameState.players.size.coerceAtLeast(2)
                                 navController.navigate("lobby/$gameId")
                             } catch (e: Exception) {
                                 Log.e("JoinGame", "Exception during getGame: ${e.message}", e)
@@ -519,7 +585,7 @@ fun CreateGameScreen(navController: NavController) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 320.dp),
+                .padding(bottom = 250.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -549,14 +615,12 @@ fun CreateGameScreen(navController: NavController) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(50.dp))
 
                 PixelArtButton(
                     label = "Create",
                     onClick = {
-                        val hostName = TokenManager.loggedInUsername ?: return@PixelArtButton.also {
-                            Toast.makeText(context, "No user logged in", Toast.LENGTH_SHORT).show()
-                        }
+                        val hostName = TokenManager.loggedInUsername ?: return@PixelArtButton
 
                         coroutineScope.launch {
                             try {
@@ -566,7 +630,7 @@ fun CreateGameScreen(navController: NavController) {
                                     token = "Bearer $token",
                                     request = CreateGameRequest(playerCount = selectedPlayers, hostName = hostName)
                                 )
-                                Toast.makeText(context, "Game Created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, "Game created! ID: ${response.gameId}", Toast.LENGTH_LONG).show()
                                 navController.navigate("lobby/${response.gameId}")
 
                             } catch (e: Exception) {
@@ -583,7 +647,6 @@ fun CreateGameScreen(navController: NavController) {
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
-
     val backStackEntry = remember(navController, gameId) {
         navController.getBackStackEntry("lobby/$gameId")
     }
@@ -595,7 +658,8 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
     val context = LocalContext.current
 
     fun handleLobbyMessage(message: String) {
-        Log.d("WebSocket", "Received message: $message")
+        viewModel.handleWebSocketMessage(message)
+
         val json = JSONObject(message)
         when (json.getString("type")) {
             "game_started" -> {
@@ -606,8 +670,6 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
             "player_joined" -> {
                 val playerArray = json.getJSONArray("players")
                 val host = json.optString("host", "")
-                Log.d("LobbyScreen", "Parsed host=$host vs player=$playerName")
-
                 Handler(Looper.getMainLooper()).post {
                     players.clear()
                     for (i in 0 until playerArray.length()) {
@@ -620,140 +682,104 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
     }
 
     LaunchedEffect(Unit) {
-        while (!stompClient.isConnected()) {
-            delay(100)
-        }
-        //Subscribe to both public and private channels
+        while (!stompClient.isConnected()) delay(100)
         stompClient.listenOn("/topic/game/$gameId") { handleLobbyMessage(it) }
         stompClient.listenOn("/user/queue/private") { handleLobbyMessage(it) }
-        delay(700) //In order to give time for subscription to happen
-        //Send join AFTER subscriptions
+        delay(700)
         try {
-            Log.d("LobbyScreen", "Sending join_game for $playerName to $gameId")
             stompClient.sendJoinGame(gameId, playerName)
-
         } catch (e: Exception) {
-            Log.e("LobbyScreen", "Failed to send join_game: ${e.message}")
-            Toast.makeText(context, "Failed to join game: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Join failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         BackgroundImage()
-
-        Text(
-            text = "Lobby",
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Serif,
-            letterSpacing = 2.sp,
-            color = Color(0xFFFFF4C2),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 65.dp)
-                .padding(start = 150.dp)
-                .align(Alignment.TopCenter)
-        )
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 80.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(top = 270.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .border(2.dp, Color(0xFFFFF4C2), RoundedCornerShape(12.dp))
-                        .padding(12.dp)
-                        .background(Color(0x99000000))
+            // Game ID block
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(2.dp, Color(0xFFFFF4C2)),
+                colors = CardDefaults.cardColors(containerColor = Color(0x66000000)),
+                modifier = Modifier
+                    .padding(bottom = 24.dp)
+                    .fillMaxWidth(0.6f)
+                    .height(70.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "Game ID: $gameId",
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFFFF4C2)
                     )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(onClick = {
-                    clipboardManager.setText(AnnotatedString(gameId))
-                    Toast.makeText(context, "Copied Game ID", Toast.LENGTH_SHORT).show()
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "Copy Game ID",
-                        tint = Color.White
-                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    IconButton(onClick = {
+                        clipboardManager.setText(AnnotatedString(gameId))
+                        Toast.makeText(context, "Copied game ID!", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy Game ID",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Waiting for players...",
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
+                text = "Waiting for players to join...",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
                 color = Color.White
             )
-            Spacer(modifier = Modifier.height(24.dp))
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             val maxPlayers = 4
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                for (i in 0 until maxPlayers) {
+                    val playerNameInList = players.getOrNull(i) ?: "Empty Slot"
+                    val displayName = if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
 
-            for (i in 0 until maxPlayers) {
-                val playerNameInList = players.getOrNull(i) ?: "Empty Slot"
-                val displayName =
-                    if (playerNameInList.trim() == playerName.trim()) "You" else playerNameInList
-
-                Button(
-                    onClick = { },
-                    enabled = false,
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .height(48.dp)
-                        .padding(vertical = 6.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0x995A3A1A),
-                        disabledContainerColor = Color(0x995A3A1A),
-                        disabledContentColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = displayName,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFFF4C2)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0x995A3A1A)),
+                        modifier = Modifier
+                            .fillMaxWidth(0.6f)
+                            .height(50.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = displayName,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(68.dp))
+            Spacer(modifier = Modifier.height(56.dp))
 
-            if (hostName.value == playerName) {
-                Button(
+            if (hostName.value == playerName && players.size > 1) {
+                PixelArtButton(
+                    label = "Start Game",
                     onClick = {
-                        Toast.makeText(context, "Game starting...", Toast.LENGTH_SHORT).show()
-                        stompClient.sendStartGame(gameId,playerName)
-                    },
-                    modifier = Modifier
-                        .width(200.dp)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC5A3A1A))
-                ) {
-                    Text(
-                        text = "Start Game",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                        stompClient.sendStartGame(gameId, playerName)
+                    }
+                )
             }
         }
     }
@@ -762,6 +788,11 @@ fun LobbyScreen(gameId: String, playerName: String, stompClient: MyClient, navCo
 @SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, navController: NavController) {
+    BackHandler(enabled = true) {}
+    val context = LocalContext.current
+    val showEndGameDialog = remember { mutableStateOf(false) }
+    val winner = remember { mutableStateOf("") }
+    val scores = remember { mutableStateListOf<Pair<String, Int>>() }
 
     val backStackEntry = remember(navController, gameId) {
         navController.getBackStackEntry("lobby/$gameId")
@@ -771,12 +802,40 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
     LaunchedEffect(gameId) {
         viewModel.setWebSocketClient(stompClient)
         viewModel.setJoinedPlayer(playerName)
-        viewModel.subscribeToGame(gameId)
-        viewModel.subscribeToPrivate()
-        viewModel.joinGame(gameId, playerName)
+
+        while (!stompClient.isConnected()) delay(100)
+
+        stompClient.listenOn("/topic/game/$gameId") { msg ->
+            val json = JSONObject(msg)
+            if (json.getString("type") == "game_over") {
+                val winnerName = json.getString("winner")
+                val scoreArray = json.getJSONArray("scores")
+                val parsedScores = mutableListOf<Pair<String, Int>>()
+                for (i in 0 until scoreArray.length()) {
+                    val entry = scoreArray.getJSONObject(i)
+                    parsedScores.add(entry.getString("player") to entry.getInt("score"))
+                }
+                winner.value = winnerName
+                scores.clear()
+                scores.addAll(parsedScores)
+                showEndGameDialog.value = true
+            }
+        }
+    }
+
+    //Music switch (only once on enter)
+    LaunchedEffect(Unit) {
+        SoundManager.playMusic(context, R.raw.gameplay_music)
     }
 
     val uiState by viewModel.uiState.collectAsState()
+
+    // Error-Toast abonnieren
+    LaunchedEffect(Unit) {
+        viewModel.errorEvents.collect { errorMsg ->
+            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // Phase-Flags (TILE-, MEEPLE- oder SCORING-Phase)
     // uiState kann Loading / Error / Success sein → deshalb erst casten
@@ -786,17 +845,16 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
     val tileMode   = phase == GamePhase.TILE_PLACEMENT
     val meepleMode = phase == GamePhase.MEEPLE_PLACEMENT
-    val scoring    = phase == GamePhase.SCORING
 
     Box(modifier = Modifier.fillMaxSize()) {
         BackgroundImage()
 
         Column(modifier = Modifier.fillMaxSize()) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(35.dp))
 
             PlayerRow(viewModel)
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             TileBackRow(viewModel, gameId, playerName)
 
@@ -805,8 +863,8 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
             if (uiState is GameUiState.Success) {
                 val gameState = (uiState as GameUiState.Success).gameState
                 val placedTiles = gameState.board.values.toList()
-                val meeples     = gameState.meeples
-                val players = gameState.players
+                val meeples = gameState.meeples
+                val players = viewModel.players
 
                 PannableTileGrid(
                     tiles = placedTiles,
@@ -824,7 +882,6 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
                         }
                     },
 
-                    // Meeple platzieren
                     onMeepleClick = { x, y, zone ->
                         if (!meepleMode) return@PannableTileGrid // wir sind nicht im Meeple-Modus
                         Log.d("GameplayScreen", "MeepleClick ausgelöst: x=$x, y=$y, zone=$zone") // Debug-Log für zone!
@@ -859,7 +916,93 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
             Spacer(modifier = Modifier.height(20.dp))
 
             BottomScreenBar(viewModel, gameId)
+            if (showEndGameDialog.value) {
+                ConfettiAnimation(visible = true)
 
+                LaunchedEffect(Unit) {
+                    SoundManager.playMusic(context, R.raw.endgame_music1)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color(0xFF2E1C0C), Color(0xFF4E342E))
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(32.dp)
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.bg_pxart),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer(alpha = 0.15f)
+                    )
+
+                    AlertDialog(
+                        onDismissRequest = {},
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showEndGameDialog.value = false
+                                    SoundManager.playMusic(context, R.raw.lobby_music)
+                                    navController.popBackStack("main", false)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF8D6E63),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Return to Main Menu", fontWeight = FontWeight.SemiBold)
+                            }
+                        },
+                        title = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "\uD83C\uDFC6 Game Over",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp,
+                                    color = Color(0xFFFFD700)
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Winner: ${winner.value}",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        },
+                        text = {
+                            Column(horizontalAlignment = Alignment.Start) {
+                                Spacer(Modifier.height(12.dp))
+                                scores.sortedByDescending { it.second }.forEachIndexed { index, (name, score) ->
+                                    Text(
+                                        text = "${index + 1}. $name – $score points",
+                                        fontSize = 16.sp,
+                                        color = if (name == winner.value) Color(0xFFFFD700) else Color.White,
+                                        fontWeight = if (name == winner.value) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        },
+                        containerColor = Color(0xFF3E2723),
+                        titleContentColor = Color.White,
+                        textContentColor = Color.White,
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
     }
 }
@@ -869,30 +1012,54 @@ fun PlayerRow(viewModel: GameViewModel) {
     val players = viewModel.players
     val currentPlayerId by viewModel.currentPlayerId
 
+    val context = LocalContext.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        players.forEach { p ->
+        players.forEachIndexed { idx, p ->
             val isCurrent = p.id == currentPlayerId
+
+            // 1) Meeple-Drawable-Name per Index
+            val meepleName = when (idx.coerceIn(0..3)) {
+                0 -> "meeple_blu"
+                1 -> "meeple_red"
+                2 -> "meeple_grn"
+                else -> "meeple_yel"
+            }
+            // 2) Ressource holen
+            val resId = remember(meepleName) {
+                context.resources.getIdentifier(meepleName, "drawable", context.packageName)
+            }
+
+            // 3) Text-Tint abhängig ob aktuell
             val tint = if (isCurrent) Color.Green else Color.White
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Player ${p.id}",
-                    tint = tint,
-                    modifier = Modifier.size(30.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(4.dp)
+            ) {
+                // statt Icons.Default.Person
+                Image(
+                    painter = painterResource(id = resId),
+                    contentDescription = "Meeple von ${p.id}",
+                    modifier = Modifier.size(35.dp)
                 )
-                Text(text = p.id,
+
+                Text(
+                    text = p.id,
                     color = tint,
                     fontSize = 12.sp
                 )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
                 Text(
                     text = "${p.score}P",
-                        color = Color.LightGray,
+                    color = Color.LightGray,
                     fontSize = 11.sp
                 )
 
@@ -955,7 +1122,6 @@ fun TileBackButton(
     }
 }
 
-@SuppressLint("DiscouragedApi")
 @Composable
 fun PannableTileGrid(
     tiles:       List<Tile>,
@@ -986,17 +1152,17 @@ fun PannableTileGrid(
         /* ❶ Pan & Zoom – immer aktiv */
         .pointerInput(Unit) {
             detectTransformGestures { _, pan, zoom, _ ->
-                scale.value   *= zoom
-                offsetX.value += pan.x
-                offsetY.value += pan.y
+                scale.floatValue   *= zoom
+                offsetX.floatValue += pan.x
+                offsetY.floatValue += pan.y
             }
         }
         /* ❷ Tap-Handling – hängt vom Modus ab */
         .pointerInput(tileMode, meepleMode) {
             detectTapGestures { offset ->
-                val scaled = tileSizePx * scale.value
-                val x = floor((offset.x - offsetX.value) / scaled).toInt()
-                val y = floor((offset.y - offsetY.value) / scaled).toInt()
+                val scaled = tileSizePx * scale.floatValue
+                val x = floor((offset.x - offsetX.floatValue) / scaled).toInt()
+                val y = floor((offset.y - offsetY.floatValue) / scaled).toInt()
 
                 /* ---------- TILE ---------- */
                 if (tileMode) onTileClick(x, y)
@@ -1004,8 +1170,8 @@ fun PannableTileGrid(
                 /* ---------- MEEPLE ---------- */
                 if (meepleMode) {
                     val seg = scaled / 3f
-                    val localX = offset.x - (x * scaled + offsetX.value)
-                    val localY = offset.y - (y * scaled + offsetY.value)
+                    val localX = offset.x - (x * scaled + offsetX.floatValue)
+                    val localY = offset.y - (y * scaled + offsetY.floatValue)
 
                     val zone = when {
                         localX <  seg         && localY in  seg..2*seg -> MeeplePosition.W
@@ -1029,14 +1195,14 @@ fun PannableTileGrid(
             .then(gestureModifier)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val scaledSize = (tileSizePx * scale.value).coerceAtLeast(1f)
+            val scaledSize = (tileSizePx * scale.floatValue).coerceAtLeast(1f)
             val seg        = scaledSize / 3f
 
             /* ---------- 1) Tiles ---------- */
             tiles.forEach { tile ->
                 val pos  = tile.position ?: return@forEach
-                val left = pos.x * scaledSize + offsetX.value
-                val top  = pos.y * scaledSize + offsetY.value
+                val left = pos.x * scaledSize + offsetX.floatValue
+                val top  = pos.y * scaledSize + offsetY.floatValue
 
                 val baseName  = tile.id.substringBeforeLast("-").replace("-", "_")
                 val derivedId = context.resources.getIdentifier(baseName, "drawable", context.packageName)
@@ -1059,8 +1225,8 @@ fun PannableTileGrid(
 
             /* ---------- 2) Meeples ---------- */
             meeples.forEach { meeple ->
-                val px = meeple.x * scaledSize + offsetX.value
-                val py = meeple.y * scaledSize + offsetY.value
+                val px = meeple.x * scaledSize + offsetX.floatValue
+                val py = meeple.y * scaledSize + offsetY.floatValue
 
                 val (cx, cy) = when (meeple.position) {
                     MeeplePosition.W -> seg*0.5f to seg*1.5f
@@ -1076,8 +1242,8 @@ fun PannableTileGrid(
 
                 val drawableName = when (idx) {
                     0 -> "meeple_blu"
-                    1 -> "meeple_grn"
-                    2 -> "meeple_red"
+                    1 -> "meeple_red"
+                    2 -> "meeple_grn"
                     else -> "meeple_yel"
                 }
 
@@ -1117,10 +1283,37 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
 
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
-    val tile = viewModel.currentTile.value //TODO: Mike oder doch collectAsState?
-    val currentPlayerId = viewModel.currentPlayerId.value
+    val context = LocalContext.current
+    val tile = viewModel.currentTile.value
     val players = viewModel.players
-    val currentPlayer = players.find { it.id == currentPlayerId }
+    val localPlayerId = TokenManager.loggedInUsername
+    val localPlayer = players.find { it.id == localPlayerId }
+
+    val idx = players.indexOfFirst { it.id == localPlayerId }
+        .let { if (it >= 0) it.coerceIn(0..3) else 0 }
+
+    val meepleDrawableName = when (idx) {
+        0 -> "meeple_blu"
+        1 -> "meeple_red"
+        2 -> "meeple_grn"
+        else -> "meeple_yel"
+    }
+
+    val meepleResId = remember(meepleDrawableName) {
+        context.resources.getIdentifier(meepleDrawableName, "drawable", context.packageName)
+    }
+
+    val noMeepleDrawableName = when (idx) {
+        0 -> "nomeeple_blu"
+        1 -> "nomeeple_red"
+        2 -> "nomeeple_grn"
+        else -> "nomeeple_yel"
+    }
+
+    val noMeepleResId = remember(idx) {
+        context.resources.getIdentifier(noMeepleDrawableName, "drawable", context.packageName)
+    }
+
     val remainingMeeples by viewModel.remainingMeeples.collectAsState()
     val isMeeplePlacementActive = viewModel.isMeeplePlacementActive.collectAsState()
     Log.d("MeeplePlacement", "UI State: ${isMeeplePlacementActive.value}") //TODO Mike dann wieder entfernen!
@@ -1143,19 +1336,28 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.meeple_blu),
+                    painter = painterResource(id = meepleResId),
                     contentDescription = "Meeple setzen",
                     modifier = Modifier
                         .size(if (isMeeplePlacementActive.value) 85.dp else 65.dp)
                         .clickable { viewModel.setMeeplePlacement(!isMeeplePlacementActive.value) }
                 )
 
-                Text(
-                    text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 7}",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = Color.Black,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "${remainingMeeples[TokenManager.loggedInUsername] ?: 7}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
             }
 
             // Mitte: Das Tile-Bild bleibt exakt zentriert
@@ -1163,8 +1365,10 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                 modifier = Modifier.height(170.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                tile?.let {
-                    DrawTile(it, viewModel)
+                if (tile != null) {
+                    DrawTile(tile, viewModel)
+                } else {
+                    Spacer(modifier = Modifier.size(135.dp))
                 }
             }
 
@@ -1177,9 +1381,9 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.meeple_no),
+                        painter = painterResource(id = noMeepleResId),
                         contentDescription = "Meeple nicht setzen",
-                        contentScale = ContentScale.FillBounds,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .size(65.dp)
                             .clickable {
@@ -1192,16 +1396,16 @@ fun BottomScreenBar(viewModel: GameViewModel, gameId: String) {
                     Box(
                         modifier = Modifier
                             .background(
-                                color = Color.White,
+                                color = Color.Black,
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(horizontal = 25.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "${currentPlayer?.score ?: 0}P",
+                            text = "${localPlayer?.score ?: 0}P",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            color = Color.White
                         )
                     }
                 }
@@ -1266,7 +1470,6 @@ fun parseErrorMessage(body: String?): String {
     }
 }
 
-@SuppressLint("DiscouragedApi")
 @Composable
 fun DrawTile(tile: Tile, viewModel: GameViewModel) {
     val context = LocalContext.current
@@ -1305,3 +1508,74 @@ fun DrawTile(tile: Tile, viewModel: GameViewModel) {
         }
     }
 }
+
+@Composable
+fun ConfettiAnimation(
+    visible: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (!visible) return
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val confettiList = remember { mutableStateListOf<ConfettiParticle>() }
+
+    LaunchedEffect(visible) {
+        while (visible) {
+            repeat(8) {
+                confettiList.add(
+                    ConfettiParticle(
+                        x = Random.nextInt(0, screenWidth.value.toInt()).dp,
+                        color = Color(
+                            red = Random.nextFloat(),
+                            green = Random.nextFloat(),
+                            blue = Random.nextFloat()
+                        )
+                    )
+                )
+            }
+            delay(200)
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        confettiList.forEach { particle ->
+            ConfettiFallingItem(
+                x = particle.x,
+                color = particle.color,
+                screenHeight = screenHeight,
+                onFinished = { confettiList.remove(particle) }
+            )
+        }
+    }
+}
+
+@Composable
+fun ConfettiFallingItem(
+    x: Dp,
+    color: Color,
+    screenHeight: Dp,
+    onFinished: () -> Unit
+) {
+    val yOffset = remember { Animatable(-10f) }
+    LaunchedEffect(Unit) {
+        yOffset.animateTo(
+            targetValue = screenHeight.value + 20f,
+            animationSpec = tween(
+                durationMillis = 2500 + Random.nextInt(0, 1000),
+                easing = LinearEasing
+            )
+        )
+        onFinished()
+    }
+    Box(
+        modifier = Modifier
+            .offset(x = x, y = yOffset.value.dp)
+            .size(8.dp)
+            .background(color = color, shape = CircleShape)
+    )
+}
+
+data class ConfettiParticle(
+    val x: Dp,
+    val color: Color
+)

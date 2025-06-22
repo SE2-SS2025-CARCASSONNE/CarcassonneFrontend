@@ -4,8 +4,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import at.se2_ss2025_gruppec.carcasonnefrontend.TokenManager
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.hildan.krossbow.stomp.StompClient
@@ -16,13 +14,11 @@ import org.hildan.krossbow.stomp.sendText
 import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import org.json.JSONObject
-import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.MeepleDto
-
 
 class MyClient(val callbacks: Callbacks) {
 
-    private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
-    //private val WEBSOCKET_URI = "ws://192.168.0.255:8080/ws/game"
+    //private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
+    private val WEBSOCKET_URI = "ws://192.168.0.12:8080/ws/game"
 
     private lateinit var client: StompClient
     private var session: StompSession? = null
@@ -85,6 +81,7 @@ class MyClient(val callbacks: Callbacks) {
             }
         }
     }
+
     fun listenOn(topic: String, onMessage: (String) -> Unit) {
         scope.launch {
             try {
@@ -102,7 +99,6 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
-
     fun isConnected(): Boolean {
         return session != null
     }
@@ -113,8 +109,6 @@ class MyClient(val callbacks: Callbacks) {
             put("player", playerName)
         }
 
-
-
         scope.launch {
             try {
                 session?.sendText("/app/game/send", json.toString())
@@ -124,6 +118,7 @@ class MyClient(val callbacks: Callbacks) {
             }
         }
     }
+
     fun sendDrawTileRequest(gameId: String, playerId: String) {
         val json = JSONObject().apply {
             put("type", "DRAW_TILE")
@@ -185,6 +180,22 @@ class MyClient(val callbacks: Callbacks) {
         scope.launch {
             session?.sendText("/app/game/send", json.toString())
             Log.d("WebSocket", "Skip meeple sent: $json")
+        }
+    }
+    fun sendEndGame(gameId: String, player: String) {
+        val json = JSONObject().apply {
+            put("type", "end_game")
+            put("gameId", gameId)
+            put("player", player)
+        }
+
+        scope.launch {
+            try {
+                session?.sendText("/app/game/send", json.toString())
+                Log.d("WebSocket", "End game message sent: $json")
+            } catch (e: Exception) {
+                Log.e("WebSocket", "Failed to send end game message: ${e.message}")
+            }
         }
     }
 }

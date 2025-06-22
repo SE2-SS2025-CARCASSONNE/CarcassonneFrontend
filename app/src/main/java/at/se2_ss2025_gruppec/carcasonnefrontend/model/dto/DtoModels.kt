@@ -10,7 +10,12 @@ data class UserDto(
     val username: String,
     val email: String
 )
-
+data class UserStatsDto(
+    val totalGames: Int,
+    val totalWins: Int,
+    val winRatio: Double,
+    val highScore: Int
+)
 // Authentifizierungs-Request-DTO
 data class AuthRequestDto(
     val username: String,
@@ -45,6 +50,7 @@ data class TileDto(
     val terrainEast: String,
     val terrainSouth: String,
     val terrainWest: String,
+    val terrainCenter: String?,
     val hasMonastery: Boolean,
     val hasShield: Boolean,
     val rotation: Int,
