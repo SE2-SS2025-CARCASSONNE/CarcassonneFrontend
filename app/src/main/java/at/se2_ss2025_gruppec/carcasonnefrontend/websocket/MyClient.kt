@@ -17,8 +17,7 @@ import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks) {
 
-    //private val WEBSOCKET_URI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
-    private val WEBSOCKET_URI = "ws://192.168.0.12:8080/ws/game"
+    private val webSocketURI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
 
     private lateinit var client: StompClient
     private var session: StompSession? = null
@@ -53,7 +52,7 @@ class MyClient(val callbacks: Callbacks) {
         scope.launch {
             try {
                 session = client.connect(
-                    WEBSOCKET_URI,
+                    webSocketURI,
                     customStompConnectHeaders = mapOf("Authorization" to "Bearer $token")
                 )
                 Log.d("WebSocket", "WebSocket connection established!")
@@ -136,6 +135,26 @@ class MyClient(val callbacks: Callbacks) {
         }
     }
 
+    fun sendCheatRedraw(gameId: String, playerId: String) {
+        val json = JSONObject().apply {
+            put("type", "CHEAT_REDRAW")
+            put("gameId", gameId)
+            put("player", playerId)
+        }
+        scope.launch { session?.sendText("/app/game/send", json.toString()) }
+    }
+
+    fun sendExposeCheater(gameId: String, playerId: String) {
+        val json = JSONObject().apply {
+            put("type", "EXPOSE_CHEATER")
+            put("gameId", gameId)
+            put("player", playerId)
+        }
+        scope.launch {
+            session?.sendText("/app/game/send", json.toString())
+        }
+    }
+
     fun sendPlaceTileRequest(payload: String){
         scope.launch {
             try {
@@ -180,22 +199,6 @@ class MyClient(val callbacks: Callbacks) {
         scope.launch {
             session?.sendText("/app/game/send", json.toString())
             Log.d("WebSocket", "Skip meeple sent: $json")
-        }
-    }
-    fun sendEndGame(gameId: String, player: String) {
-        val json = JSONObject().apply {
-            put("type", "end_game")
-            put("gameId", gameId)
-            put("player", player)
-        }
-
-        scope.launch {
-            try {
-                session?.sendText("/app/game/send", json.toString())
-                Log.d("WebSocket", "End game message sent: $json")
-            } catch (e: Exception) {
-                Log.e("WebSocket", "Failed to send end game message: ${e.message}")
-            }
         }
     }
 }

@@ -1,24 +1,25 @@
 [versions]
-agp = "8.9.0"
+agp = "8.10.1"
 kotlin = "2.0.21"
-coreKtx = "1.15.0"
+coreKtx = "1.16.0"
 junit = "4.13.2"
 junitJupiterApi = "5.11.4"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 krossbowStompCore = "7.0.0"
 krossbowWebsocketOkhttp = "7.0.0"
-lifecycleRuntimeKtx = "2.8.7"
+lifecycleRuntimeKtx = "2.9.1"
 activityCompose = "1.10.1"
-composeBom = "2024.09.00"
-mockitoKotlin = "5.0.0"
+composeBom = "2025.06.01"
+mockitoKotlin = "5.2.1"
 mockk = "1.13.7"
-navigation-compose = "2.7.6"
-material-icons-extended = "1.6.7"
+navigation-compose = "2.9.0"
+material-icons-extended = "1.7.8"
 retrofit = "2.9.0"
 gson-converter = "2.9.0"
-uiGraphics = "1.6.0"
+uiGraphics = "1.8.3"
 coroutines = "1.10.2"
+core-testing = "2.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -39,6 +40,7 @@ ui-graphics = { module = "androidx.compose.ui:ui-graphics", version.ref = "uiGra
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-arch-core = { group= "androidx.arch.core", name = "core-testing", version.ref = "core-testing" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation-compose" }

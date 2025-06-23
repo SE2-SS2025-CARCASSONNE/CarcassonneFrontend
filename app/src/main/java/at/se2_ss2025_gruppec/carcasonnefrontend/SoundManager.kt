@@ -1,7 +1,6 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.media.MediaPlayer
 
 object SoundManager {
@@ -13,15 +12,6 @@ object SoundManager {
 
     var isMuted: Boolean = false
         private set
-
-    private const val PREFS_NAME = "sound_prefs"
-    private const val KEY_VOLUME = "volume"
-    private const val KEY_MUTED = "isMuted"
-
-    fun init(context: Context) {
-        loadPreferences(context)
-        playMusic(context, R.raw.lobby_music)
-    }
 
     fun playMusic(context: Context, musicResId: Int) {
         if (currentTrack == musicResId && mediaPlayer?.isPlaying == true) return
@@ -51,6 +41,12 @@ object SoundManager {
         mediaPlayer?.pause()
     }
 
+    fun resumeMusic(context: Context) {
+        currentTrack?.let { resId ->
+            playMusic(context, resId)
+        }
+    }
+
     fun setVolume(newVolume: Float) {
         volume = newVolume.coerceIn(0f, 1f)
         isMuted = volume == 0f
@@ -65,20 +61,5 @@ object SoundManager {
     fun unmute() {
         isMuted = false
         mediaPlayer?.setVolume(volume, volume)
-    }
-
-    fun savePreferences(context: Context) {
-        val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putFloat(KEY_VOLUME, volume)
-            putBoolean(KEY_MUTED, isMuted)
-            apply()
-        }
-    }
-
-    fun loadPreferences(context: Context) {
-        val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        volume = prefs.getFloat(KEY_VOLUME, 0.5f)
-        isMuted = prefs.getBoolean(KEY_MUTED, false)
     }
 }

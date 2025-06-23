@@ -11,13 +11,15 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.ScoringEvent
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -27,16 +29,15 @@ class GameViewModel : ViewModel() {
     fun setJoinedPlayer(name: String) { joinedPlayerName = name }
 
     private val _placedTiles = mutableStateListOf<Tile>()
-    val placedTiles: List<Tile> = _placedTiles
 
     private val _currentTile = mutableStateOf<Tile?>(null)
     val currentTile: State<Tile?> get() = _currentTile
 
-    private val _validPlacements = MutableStateFlow<List<Pair<Position,TileRotation>>>(emptyList())
-    val validPlacements: StateFlow<List<Pair<Position,TileRotation>>> = _validPlacements
-
     private val _deckRemaining = MutableStateFlow(0)
     val deckRemaining: StateFlow<Int> = _deckRemaining
+
+    private val _canExpose = MutableStateFlow(true)
+    val canExpose: StateFlow<Boolean> get() = _canExpose
 
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
     val uiState: StateFlow<GameUiState> = _uiState
@@ -53,9 +54,19 @@ class GameViewModel : ViewModel() {
     private val _remainingMeeples = MutableStateFlow(mapOf<String, Int>())
     val remainingMeeples: StateFlow<Map<String, Int>> get() = _remainingMeeples
 
-    // 1A) Channel für Error-Events vom WebSocket
-    private val _errorEvents = Channel<String>(Channel.BUFFERED)
-    val errorEvents = _errorEvents.receiveAsFlow()
+    private val _errorEvents = MutableSharedFlow<String>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val errorEvents = _errorEvents.asSharedFlow()
+
+    private val _scoringEvents = MutableSharedFlow<ScoringEvent>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val scoringEvents = _scoringEvents.asSharedFlow()
 
 
     fun setMeeplePlacement(active: Boolean) {
@@ -82,12 +93,20 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    fun cheatRedraw(gameId: String) {
+        joinedPlayerName?.let { webSocketClient.sendCheatRedraw(gameId, it) }
+    }
+
+    fun exposeCheater(gameId: String) {
+        if (_canExpose.value) {
+            webSocketClient.sendExposeCheater(gameId, joinedPlayerName!!)
+        }
+    }
+
     fun handleWebSocketMessage(msg: String) {
         try {
             val json = JSONObject(msg)
-            val type = json.getString("type")
-
-            when (type) {
+            when (val type = json.getString("type")) {
                 "player_joined" -> {
                     val arr = json.getJSONArray("players")
 
@@ -111,19 +130,37 @@ class GameViewModel : ViewModel() {
                     val tileJson = json.getJSONObject("tile")
                     val tile = parseTileFromJson(tileJson)
                     onTileDrawn(tile)
+                }
 
-                    if (json.has("validPlacements")) {
-                        val validPlacementsJson = json.getJSONArray("validPlacements")
-                        val validPlacementList = mutableListOf<Pair<Position,TileRotation>>()
-                        for (i in 0 until validPlacementsJson.length()) {
-                            val temp = validPlacementsJson.getJSONObject(i)
-                            val posObj = temp.getJSONObject("position")
-                            val position = Position(posObj.getInt("x"), posObj.getInt("y"))
-                            val rotation = TileRotation.valueOf(temp.getString("rotation"))
-                            validPlacementList += position to rotation
-                        }
-                        _validPlacements.value = validPlacementList
+                "CHEAT_TILE_DRAWN" -> {
+                    val tileJson = json.getJSONObject("tile")
+                    val tile = parseTileFromJson(tileJson)
+                    onTileDrawn(tile)
+
+                    viewModelScope.launch {
+                        _errorEvents.emit("You cheated...")
                     }
+                }
+
+                "expose_success" -> {
+                    val culprit = json.getString("culprit")
+                    val accuser = json.getString("accuser")
+                    _canExpose.value = false
+                    updateGameWithScore(json)
+
+                    viewModelScope.launch {
+                        _errorEvents.emit("$accuser exposed $culprit! –2 points")
+                    }
+                }
+
+                "expose_fail" -> {
+                    val accuser = json.getString("player")
+                    if (accuser == joinedPlayerName) {
+                        viewModelScope.launch {
+                            _errorEvents.emit("False accusation! –1 point")
+                        }
+                    }
+                    updateGameWithScore(json)
                 }
 
                 "deck_update" -> {
@@ -172,14 +209,15 @@ class GameViewModel : ViewModel() {
 
                 "score_update" -> {
                     updateGameWithScore(json)
+                    setCurrentPlayerId(json.optString("nextPlayer"))
 
                     val phaseStr = json.optString("gamePhase", GamePhase.TILE_PLACEMENT.name)
                     val newPhase = GamePhase.valueOf(phaseStr)
 
                     _isMeeplePlacementActive.value = false
                     _currentTile.value = null
-                    _validPlacements.value = emptyList()
                     _currentPlayerId.value = json.getString("nextPlayer")
+                    _canExpose.value = true
 
                     val current = _uiState.value
                     if (current is GameUiState.Success) {
@@ -198,13 +236,22 @@ class GameViewModel : ViewModel() {
                     }
                 }
 
+                "feature_scored" -> {
+                    val player  = json.getString("player")
+                    val points  = json.getInt("points")
+                    val feature = json.getString("feature")
+                    viewModelScope.launch {
+                        _scoringEvents.emit(ScoringEvent(player, points, feature))
+                    }
+                }
+
                 "error" -> {
                     val message = json.getString("message")
                     Log.e("WebSocket", "Error from server: $message")
 
                     // Fehlermeldung in den Channel senden
                     viewModelScope.launch {
-                        _errorEvents.send(message)
+                        _errorEvents.emit(message)
                     }
 
                     if (message.contains("no more playable tiles", ignoreCase = true)) {
@@ -222,14 +269,8 @@ class GameViewModel : ViewModel() {
                         // Extrahiere die Spieler-ID, die das Meeple gesetzt hat
                         val playerId = json.getString("player")
 
-                        // Extrahiere die Position des Meeples
-                        val position = Position(
-                            x = meepleJson.getInt("x"),
-                            y = meepleJson.getInt("y")
-                        )
-
                         // Aktualisiere das Spielfeld mit dem gesetzten Meeple
-                        updateBoardWithMeeple(meeple, position, playerId)
+                        updateBoardWithMeeple(meeple, playerId)
 
                         // Meeple-Anzahl aktualisieren
                         updateRemainingMeeples(playerId, remainingMeeple)
@@ -355,9 +396,8 @@ class GameViewModel : ViewModel() {
         _placedTiles.clear()
         _placedTiles.addAll(updatedBoard.values)
 
-        // Clear drawn tile and valid placements
+        // Clear drawn tile
         _currentTile.value  = null
-        _validPlacements.value = emptyList()
 
         Log.d("GameViewModel", "Board now has ${updatedBoard.size} placed tiles")
     }
@@ -445,7 +485,7 @@ class GameViewModel : ViewModel() {
         )
     }
 
-    private fun updateBoardWithMeeple(meeple: Meeple, position: Position, playerId: String) {
+    private fun updateBoardWithMeeple(meeple: Meeple, playerId: String) {
         val currentState = _uiState.value
         if (currentState is GameUiState.Success) {
             val updatedMeeples = currentState.gameState.meeples.toMutableList()
@@ -483,9 +523,6 @@ class GameViewModel : ViewModel() {
                 )
             } ?: existing
         }
-
-        // Advance the UI to new current player
-        setCurrentPlayerId(json.optString("nextPlayer"))
     }
 }
 
@@ -493,7 +530,7 @@ class GameViewModel : ViewModel() {
  * UI State to handle frontend screen behavior
  */
 sealed class GameUiState {
-    object Loading : GameUiState()
+    data object Loading : GameUiState()
     data class Success(val gameState: GameState) : GameUiState()
     data class Error(val message: String) : GameUiState()
 }
