@@ -10,12 +10,11 @@ data class Player(
     val availableMeeples: Int = 7
 )
 
-enum class TerrainType {
-    ROAD,
-    CITY,
-    MONASTERY,
-    FIELD
-}
+data class ScoringEvent(
+    val playerId: String,
+    val points:   Int,
+    val feature:  String
+)
 
 enum class TileRotation(val degrees: Int) {
     NORTH(0),
@@ -40,12 +39,6 @@ data class Tile(
     val drawableRes: Int? = null
 )
 
-enum class MeepleType {
-    KNIGHT,
-    THIEF,
-    MONK
-}
-
 enum class MeeplePosition {
     N, // North
     E, // East
@@ -57,11 +50,10 @@ enum class MeeplePosition {
 data class Meeple(
     val id: String,
     val playerId: String,
-    // val type: MeepleType, ehemals, wird jetzt in Backend gelöst
     val tileId: String? = null,
     val position: MeeplePosition? = null, //N, E, S, W oder C
-    val x: Int,                   // Board‐X
-    val y: Int                    // Board‐Y
+    val x: Int,
+    val y: Int
 )
 
 data class GameState(

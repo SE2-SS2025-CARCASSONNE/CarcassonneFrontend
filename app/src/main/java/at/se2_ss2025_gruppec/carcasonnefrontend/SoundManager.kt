@@ -1,7 +1,6 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.media.MediaPlayer
 
 object SoundManager {
@@ -13,11 +12,6 @@ object SoundManager {
 
     var isMuted: Boolean = false
         private set
-
-    private const val PREFS_NAME = "sound_prefs"
-    private const val KEY_VOLUME = "volume"
-    private const val KEY_MUTED = "isMuted"
-
 
     fun playMusic(context: Context, musicResId: Int) {
         if (currentTrack == musicResId && mediaPlayer?.isPlaying == true) return
@@ -67,20 +61,5 @@ object SoundManager {
     fun unmute() {
         isMuted = false
         mediaPlayer?.setVolume(volume, volume)
-    }
-
-    fun savePreferences(context: Context) {
-        val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putFloat(KEY_VOLUME, volume)
-            putBoolean(KEY_MUTED, isMuted)
-            apply()
-        }
-    }
-
-    fun loadPreferences(context: Context) {
-        val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        volume = prefs.getFloat(KEY_VOLUME, 0.5f)
-        isMuted = prefs.getBoolean(KEY_MUTED, false)
     }
 }

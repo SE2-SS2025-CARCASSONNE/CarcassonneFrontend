@@ -20,8 +20,8 @@
 ### 1.1 Spielübersicht
 
 **Titel:** Carcassonne Android  
-**Plattform:** Android (mit Jetpack Compose)  
-**Backend:** Java Spring Boot  
+**Plattform:** Android (Kotlin mit Jetpack Compose)  
+**Backend:** Kotlin Spring Boot  
 **Datenbank:** PostgreSQL  
 **Multiplayer:** Nur Mehrspieler (2 – 4 Spieler)
 

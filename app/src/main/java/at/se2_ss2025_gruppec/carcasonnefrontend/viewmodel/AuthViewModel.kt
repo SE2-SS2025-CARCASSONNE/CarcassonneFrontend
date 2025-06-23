@@ -4,9 +4,9 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.authApi
-import at.se2_ss2025_gruppec.carcasonnefrontend.LoginRequest
-import at.se2_ss2025_gruppec.carcasonnefrontend.RegisterRequest
 import at.se2_ss2025_gruppec.carcasonnefrontend.TokenManager
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.LoginRequest
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.RegisterRequest
 import at.se2_ss2025_gruppec.carcasonnefrontend.parseErrorMessage
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
