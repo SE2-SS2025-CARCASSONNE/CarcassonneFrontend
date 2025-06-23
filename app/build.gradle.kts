@@ -127,6 +127,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.gson.converter)
 
+    testImplementation(libs.androidx.arch.core)
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.kotlinx.coroutines)
@@ -139,4 +140,5 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    testImplementation(kotlin("test"))
 }
