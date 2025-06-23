@@ -11,13 +11,15 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Player
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.ScoringEvent
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Tile
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.TileRotation
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -52,9 +54,19 @@ class GameViewModel : ViewModel() {
     private val _remainingMeeples = MutableStateFlow(mapOf<String, Int>())
     val remainingMeeples: StateFlow<Map<String, Int>> get() = _remainingMeeples
 
-    // 1A) Channel für Error-Events vom WebSocket
-    private val _errorEvents = Channel<String>(Channel.BUFFERED)
-    val errorEvents = _errorEvents.receiveAsFlow()
+    private val _errorEvents = MutableSharedFlow<String>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val errorEvents = _errorEvents.asSharedFlow()
+
+    private val _scoringEvents = MutableSharedFlow<ScoringEvent>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val scoringEvents = _scoringEvents.asSharedFlow()
 
 
     fun setMeeplePlacement(active: Boolean) {
@@ -128,7 +140,7 @@ class GameViewModel : ViewModel() {
                     onTileDrawn(tile)
 
                     viewModelScope.launch {
-                        _errorEvents.send("You cheated...")
+                        _errorEvents.emit("You cheated...")
                     }
                 }
 
@@ -139,7 +151,7 @@ class GameViewModel : ViewModel() {
                     updateGameWithScore(json)
 
                     viewModelScope.launch {
-                        _errorEvents.send("$accuser exposed $culprit! –2 points")
+                        _errorEvents.emit("$accuser exposed $culprit! –2 points")
                     }
                 }
 
@@ -147,7 +159,7 @@ class GameViewModel : ViewModel() {
                     val accuser = json.getString("player")
                     if (accuser == joinedPlayerName) {
                         viewModelScope.launch {
-                            _errorEvents.send("False accusation! –1 point")
+                            _errorEvents.emit("False accusation! –1 point")
                         }
                     }
                     updateGameWithScore(json)
@@ -226,13 +238,22 @@ class GameViewModel : ViewModel() {
                     }
                 }
 
+                "feature_scored" -> {
+                    val player  = json.getString("player")
+                    val points  = json.getInt("points")
+                    val feature = json.getString("feature")
+                    viewModelScope.launch {
+                        _scoringEvents.emit(ScoringEvent(player, points, feature))
+                    }
+                }
+
                 "error" -> {
                     val message = json.getString("message")
                     Log.e("WebSocket", "Error from server: $message")
 
                     // Fehlermeldung in den Channel senden
                     viewModelScope.launch {
-                        _errorEvents.send(message)
+                        _errorEvents.emit(message)
                     }
 
                     if (message.contains("no more playable tiles", ignoreCase = true)) {

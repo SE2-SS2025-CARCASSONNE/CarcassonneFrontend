@@ -853,10 +853,21 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
 
     val uiState by viewModel.uiState.collectAsState()
 
-    // Error-Toast abonnieren
+    // Error-Toasts subscriben
     LaunchedEffect(Unit) {
         viewModel.errorEvents.collect { errorMsg ->
             Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Scoring-Toasts subscriben
+    LaunchedEffect(Unit) {
+        viewModel.scoringEvents.collect { ev ->
+            Toast.makeText(
+                    context,
+                    "${ev.playerId} scored ${ev.points}P on a ${ev.feature}!",
+                    Toast.LENGTH_SHORT
+            ).show()
         }
     }
 

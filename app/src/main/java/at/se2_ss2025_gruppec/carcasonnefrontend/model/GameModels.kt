@@ -17,6 +17,12 @@ enum class TerrainType {
     FIELD
 }
 
+data class ScoringEvent(
+    val playerId: String,
+    val points:   Int,
+    val feature:  String
+)
+
 enum class TileRotation(val degrees: Int) {
     NORTH(0),
     EAST(90),
