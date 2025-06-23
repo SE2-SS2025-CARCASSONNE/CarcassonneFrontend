@@ -49,7 +49,12 @@ class GameViewModelTest {
 
     @Test
     fun `rotateCurrentTile should rotate clockwise`() = runTest {
-        val tile = Tile("t1", "ROAD", "CITY", "FIELD", "CITY", tileRotation = TileRotation.NORTH)
+        val tile = Tile(
+            "t1", "ROAD", "CITY", "FIELD", "CITY", tileRotation = TileRotation.NORTH,
+            center = "FIELD",
+            hasMonastery = false,
+            hasShield = false
+        )
         viewModel.onTileDrawn(tile)
 
         viewModel.rotateCurrentTile()
@@ -61,7 +66,12 @@ class GameViewModelTest {
 
     @Test
     fun `clearCurrentTile should reset currentTile to null`() = runTest {
-        val tile = Tile("t1", "CITY", "CITY", "ROAD", "FIELD")
+        val tile = Tile(
+            "t1", "CITY", "CITY", "ROAD", "FIELD",
+            center = "FIELD",
+            hasMonastery = false,
+            hasShield = false
+        )
         viewModel.onTileDrawn(tile)
         viewModel.clearCurrentTile()
 
@@ -73,7 +83,12 @@ class GameViewModelTest {
         every { mockClient.isConnected() } returns true
 
         val tile =
-            Tile("tile123", "ROAD", "CITY", "FIELD", "ROAD", tileRotation = TileRotation.NORTH)
+            Tile(
+                "tile123", "ROAD", "CITY", "FIELD", "ROAD", tileRotation = TileRotation.NORTH,
+                center = "FIELD",
+                hasMonastery = false,
+                hasShield = false
+            )
         viewModel.onTileDrawn(tile)
 
         val pos = Position(2, 3)
@@ -93,7 +108,11 @@ class GameViewModelTest {
     @Test
     fun `placeTileAt should not send if WebSocket is not connected`() = runTest {
         every { mockClient.isConnected() } returns false
-        val tile = Tile("tile123", "CITY", "FIELD", "ROAD", "ROAD")
+        val tile = Tile("tile123", "CITY", "FIELD", "ROAD", "ROAD",
+            center = "FIELD",
+            hasMonastery = false,
+            hasShield = false
+        )
         viewModel.onTileDrawn(tile)
         viewModel.placeTileAt(Position(1, 1), "gameABC")
 
@@ -130,7 +149,11 @@ class GameViewModelTest {
     fun `isValidPlacement returns false if tile is null or already placed`() = runTest {
         assertFalse(viewModel.isValidPlacement(Position(0, 0)))
 
-        val tile = Tile("t1", "FIELD", "FIELD", "ROAD", "FIELD", position = Position(1, 1))
+        val tile = Tile("t1", "FIELD", "FIELD", "ROAD", "FIELD", position = Position(1, 1),
+            center = "FIELD",
+            hasMonastery = false,
+            hasShield = false
+        )
         viewModel.onTileDrawn(tile)
         viewModel.placeTileAt(Position(1, 1), "gameZ") // will place it
 
@@ -145,7 +168,7 @@ class GameViewModelTest {
                     "terrainSouth":"ROAD",
                     "terrainWest":"FIELD",
                     "tileRotation":"NORTH",
-                    "position":{"x":1,"y":1}
+                    "position":{"x":1,"y":1},
                 },
                 "player":{"id":"player1"},
                 "gamePhase":"TILE_PLACEMENT"
