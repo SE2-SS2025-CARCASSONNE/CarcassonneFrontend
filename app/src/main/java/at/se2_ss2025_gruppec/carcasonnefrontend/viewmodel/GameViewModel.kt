@@ -106,9 +106,7 @@ class GameViewModel : ViewModel() {
     fun handleWebSocketMessage(msg: String) {
         try {
             val json = JSONObject(msg)
-            val type = json.getString("type")
-
-            when (type) {
+            when (val type = json.getString("type")) {
                 "player_joined" -> {
                     val arr = json.getJSONArray("players")
 
@@ -271,14 +269,8 @@ class GameViewModel : ViewModel() {
                         // Extrahiere die Spieler-ID, die das Meeple gesetzt hat
                         val playerId = json.getString("player")
 
-                        // Extrahiere die Position des Meeples
-                        val position = Position(
-                            x = meepleJson.getInt("x"),
-                            y = meepleJson.getInt("y")
-                        )
-
                         // Aktualisiere das Spielfeld mit dem gesetzten Meeple
-                        updateBoardWithMeeple(meeple, position, playerId)
+                        updateBoardWithMeeple(meeple, playerId)
 
                         // Meeple-Anzahl aktualisieren
                         updateRemainingMeeples(playerId, remainingMeeple)
@@ -493,7 +485,7 @@ class GameViewModel : ViewModel() {
         )
     }
 
-    private fun updateBoardWithMeeple(meeple: Meeple, position: Position, playerId: String) {
+    private fun updateBoardWithMeeple(meeple: Meeple, playerId: String) {
         val currentState = _uiState.value
         if (currentState is GameUiState.Success) {
             val updatedMeeples = currentState.gameState.meeples.toMutableList()
@@ -538,7 +530,7 @@ class GameViewModel : ViewModel() {
  * UI State to handle frontend screen behavior
  */
 sealed class GameUiState {
-    object Loading : GameUiState()
+    data object Loading : GameUiState()
     data class Success(val gameState: GameState) : GameUiState()
     data class Error(val message: String) : GameUiState()
 }

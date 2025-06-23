@@ -1,6 +1,12 @@
 package at.se2_ss2025_gruppec.carcasonnefrontend
 
-import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.UserStatsDto
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.CreateGameRequest
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.CreateGameResponse
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.GameStateDTO
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.LoginRequest
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.RegisterRequest
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.TokenResponse
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.UserStatsDto
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
@@ -8,29 +14,6 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
-
-// Updated to match backend Player model
-data class PlayerDTO(
-    val id: String,
-    val score: Int,
-    val meeplesLeft: Int,
-    val pointsThisTurn: Int
-)
-
-// Updated to use PlayerDTO instead of List<String>
-data class GameStateDTO(
-    val gameId: String,
-    val players: List<PlayerDTO>,
-    val status: String,
-    val currentPlayerIndex: Int
-)
-
-data class CreateGameRequest(val playerCount: Int, val hostName: String)
-data class CreateGameResponse(val gameId: String)
-
-data class LoginRequest(val username: String, val password: String)
-data class RegisterRequest(val username: String, val password: String)
-data class TokenResponse(val token: String)
 
 // Retrofit API interface for game
 interface GameApi {
@@ -67,7 +50,7 @@ interface StatsApi {
 // Singleton Retrofit client
 object ApiClient {
     private val retrofit = Retrofit.Builder()
-        .baseUrl("http://10.0.2.2:8080/") // Use this IP for Android Emulator
+        .baseUrl("http://10.0.2.2:8080/") // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 

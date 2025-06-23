@@ -76,7 +76,7 @@ import androidx.compose.ui.unit.*
 import androidx.compose.foundation.shape.CircleShape
 import kotlin.random.Random
 import androidx.compose.foundation.layout.offset
-import at.se2_ss2025_gruppec.carcasonnefrontend.model.dto.UserStatsDto
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.UserStatsDto
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Position
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.Meeple
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.MeeplePosition
@@ -92,9 +92,11 @@ import java.util.UUID
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import at.se2_ss2025_gruppec.carcasonnefrontend.model.CreateGameRequest
 import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
+    @SuppressLint("SourceLockedOrientationActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -175,7 +177,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GlobalSoundMenu() {
     var showVolumeControl by remember { mutableStateOf(false) }
-    var volumeLevel by remember { mutableStateOf(SoundManager.volume) }
+    var volumeLevel by remember { mutableFloatStateOf(SoundManager.volume) }
     var isMuted by remember { mutableStateOf(SoundManager.isMuted) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -252,6 +254,7 @@ fun GlobalSoundMenu() {
     }
 }
 
+@SuppressLint("UseOfNonLambdaOffsetOverload")
 @Composable
 fun LandingScreen(onStartTapped: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition()
@@ -598,7 +601,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 
 @Composable
 fun CreateGameScreen(navController: NavController) {
-    var selectedPlayers by remember { mutableStateOf(2) }
+    var selectedPlayers by remember { mutableIntStateOf(2) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -1053,6 +1056,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
     }
 }
 
+@SuppressLint("DiscouragedApi")
 @Composable
 fun PlayerRow(viewModel: GameViewModel) {
     val players = viewModel.players
@@ -1173,6 +1177,7 @@ fun TileBackButton(
     }
 }
 
+@SuppressLint("DiscouragedApi")
 @Composable
 fun PannableTileGrid(
     tiles:       List<Tile>,
@@ -1335,6 +1340,7 @@ fun drawableToBitmap(drawable: Drawable, width: Int, height: Int): Bitmap {
     return bitmap
 }
 
+@SuppressLint("DiscouragedApi")
 @Composable
 fun BottomScreenBar(viewModel: GameViewModel, gameId: String, phase: GamePhase?, currentPlayerId: String?) {
     val context = LocalContext.current
@@ -1572,6 +1578,7 @@ fun parseErrorMessage(body: String?): String {
     }
 }
 
+@SuppressLint("DiscouragedApi")
 @Composable
 fun DrawTile(tile: Tile, viewModel: GameViewModel) {
     val context = LocalContext.current
@@ -1611,6 +1618,7 @@ fun DrawTile(tile: Tile, viewModel: GameViewModel) {
     }
 }
 
+@SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 fun ConfettiAnimation(
     visible: Boolean,
@@ -1651,6 +1659,7 @@ fun ConfettiAnimation(
     }
 }
 
+@SuppressLint("UseOfNonLambdaOffsetOverload")
 @Composable
 fun ConfettiFallingItem(
     x: Dp,
