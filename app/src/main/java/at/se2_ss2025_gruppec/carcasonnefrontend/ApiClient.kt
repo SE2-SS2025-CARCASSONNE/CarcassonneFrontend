@@ -50,7 +50,7 @@ interface StatsApi {
 // Singleton Retrofit client
 object ApiClient {
     private val retrofit = Retrofit.Builder()
-        .baseUrl("http://10.0.2.2:8080/") // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
+        .baseUrl("http://192.168.0.12:8080/") // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
