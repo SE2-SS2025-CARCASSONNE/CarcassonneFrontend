@@ -8,6 +8,8 @@ import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.MyClient
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.mockkStatic
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -35,6 +37,10 @@ class GameViewModelTest {
 
     @Before
     fun setup() {
+        mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
+        
         Dispatchers.setMain(testDispatcher)
         mockClient = mockk(relaxed = true)
         viewModel = GameViewModel()
