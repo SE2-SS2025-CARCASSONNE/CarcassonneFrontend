@@ -287,7 +287,6 @@ class GameViewModel : ViewModel() {
                         // Meeple-Modus aktivieren, wenn wir uns in der Phase MEEPLE_PLACEMENT befinden
                         setMeeplePlacement(newPhase == GamePhase.MEEPLE_PLACEMENT)
 
-                        // Log.d("WebSocket", "Meeple gesetzt: ${meeple.id} an Position ($position.x, $position.y)")
                         Log.d("GameViewModel", "Meeple gesetzt: ${meeple.id}, verbleibende Meeples für $playerId: $remainingMeeple")
 
                     } catch (e: Exception) {
