@@ -2,6 +2,9 @@
 
 # 📘 Projekt: Carcassonne für Android
 
+👉 [Hier geht's zur Projekt-Homepage auf itch.io!](https://j0klar.itch.io/pixel-carcassonne)
+
+👉 [Und hier zum detaillierten Install-Guide!](https://github.com/SE2-SS2025-CARCASSONNE/CarcassonneBackend)
 
 ## 📑 Inhaltsverzeichnis
 
@@ -245,7 +248,7 @@ Endpunktestand aller Spieler, mit Hervorhebung des Sieger und Möglichkeit zum M
 
 ## 3. Weiterführende Links
 
-- 🌐 **Projekthomepage auf itch.io**:  
+- 🌐 **Projekt-Homepage auf itch.io**:  
   👉 [https://j0klar.itch.io/pixel-carcassonne](https://j0klar.itch.io/pixel-carcassonne)
 > Hier findest du die veröffentlichte Version der App, weitere Infos und Screenshots des Spiels, welches du auch gerne bewerten kannst!
 
