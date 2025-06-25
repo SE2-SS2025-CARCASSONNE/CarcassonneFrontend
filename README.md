@@ -1,6 +1,6 @@
 ![App Logo](docs/images/logo_pxart.png)
 
-# 📘 Projekt: Carcassonne Android
+# 📘 Projekt: Carcassonne für Android
 
 
 ## 📑 Inhaltsverzeichnis
@@ -9,10 +9,10 @@
   - [1.1 Spielübersicht](#11-spielübersicht)
   - [1.2 Spiellogik](#12-spiellogik)
   - [1.3 Systemdesign](#13-systemdesign)
-  - [1.4 UIUX Anforderungen](#14-uiux-anforderungen)
+  - [1.4 UI/UX-Anforderungen](#14-uiux-anforderungen)
   - [1.5 Spielzug-Ablauf](#15-spielzug-ablauf)
   - [1.6 Spielende](#16-spielende)
-- [2. App UI - Screenshots](#2-app-ui---screenshots)
+- [2. App-UI - Screenshots](#2-app-ui---screenshots)
 - [3. Weiterführende Links](#3-weiterführende-links)
 
 ---
@@ -21,21 +21,26 @@
 
 ### 1.1 Spielübersicht
 
-**Titel:** Carcassonne Android  
-**Plattform:** Android (Kotlin mit Jetpack Compose)  
-**Backend:** Kotlin Spring Boot  
+**Titel:** Carcassonne für Android  
+**Plattform:** Android (Kotlin / Jetpack Compose)  
+**Backend:** Kotlin (Spring Boot)  
 **Datenbank:** PostgreSQL  
-**Multiplayer:** Nur Mehrspieler (2 – 4 Spieler)
+**Spielerzahl:** 2 bis 4 (ausschließlich Mehrspieler‑Modus)
 
 #### Projektziel:
-Wir entwickeln eine digitale, mehrspielerfähige Version des Brettspiels Carcassonne, bei der die Spieler abwechselnd Landschaftskarten legen, Städte, Straßen und Klöster bauen und Meeples auf Felder setzen, um Punkte zu sammeln. Das Spiel endet, wenn alle Karten gelegt sind. Der Spieler mit den meisten Punkten gewinnt.
+Dieses Projekt realisiert eine digitale Mehrspieler‑Version des Brettspiels Carcassonne:
 
-Dieses Projekt umfasst:
+- Landschaftskarten abwechselnd legen
+- Städte, Straßen und Klöster bauen
+- Meeples setzen, um Punkte zu sammeln
+- Spielende, wenn alle Karten gelegt sind - höchste Punktzahl gewinnt
 
-- Eine voll interaktive Android-Benutzeroberfläche
-- Echtzeit-Mehrspielerfunktion (kein Bot)
-- Synchronisierung des Spielstatus zwischen Spielern
-- Sicheres Backend für Spielregeln, Punktevergabe und Datenspeicherung
+Umfang:
+
+- Interaktive Android‑UI mit Zoom‑ und Scroll-Gesten
+- Echtzeit-Mehrspieler via WebSocket (kein Bot)
+- Synchronisierung des Spielstatus zwischen allen Spielern
+- Sicheres Backend für Spielregeln, Punktevergabe und Persistenz
 - Persistente Speicherung von Spieler- und Spieldaten
 
 ---
@@ -46,70 +51,67 @@ Dieses Projekt umfasst:
 
 **Was Spieler tun:**
 
-- In ihrem Zug ziehen Spieler eine zufällige Karte aus dem Stapel.
-- Sie können die Karte rotieren (0°, 90°, 180°, 270°).
-- Die Karte muss an eine bestehende Karte angrenzen und alle Kanten müssen passend sein (z.B. Stadt an Stadt).
-- Wenn die Karte nicht gelegt werden kann, wird sie ans Ende der Kartendecks gegeben, wird also am Ende des Spiels neu zum Legen angeboten und der Spieler darf eine neue Karte ziehen.
+- Aktiver Spieler zieht eine zufällige Karte aus dem Stapel
+- Karte kann um 0°, 90°, 180° oder 270° gedreht werden
+- Die Karte muss an mindestens eine bestehende Karte angrenzen - alle Kanten müssen zueinander passen (z.B. Stadt an Stadt)
+- Kann keine gültige Platzierung gefunden werden, wird die Karte zurück unter den Stapel gelegt und eine neue Karte gezogen
 
 **Technische Hinweise:**
 
-- Der Kartenstapel wird im Vorfeld definiert und mit Seed-basierter Zufallslogik generiert.
-- Das Spielfeld wird als dynamisches Koordinatensystem (x, y) verwaltet.
-- Karten werden in einer Map-Struktur gespeichert und können in alle Richtungen erweitert werden.
+- Kartenstapel wird einmalig mit seed‑basierter Zufallslogik erzeugt.
+- Spielfeld als dynamisches Koordinatensystem (x,y) implementiert
+- Karten werden in Map-Struktur gespeichert und können in alle Richtungen erweitert werden
 
 #### ▶️ Meeple-Platzierung
 
 **Was Spieler tun:**
 
-- Nach dem Platzieren einer Karte kann der Spieler optional einen Meeple auf ein Segment der neu platzierten Karte setzen.
-- Mögliche Funktionen des Meeples: Ritter (Stadt), Wegelagerer (Straße) oder Mönch (Kloster).
-- Die Platzierung eines Meeples auf einem Segment ist nur erlaubt, wenn das entsprechende Feature (Stadt, Straße) nicht bereits durch einen Meeple auf einer verbundenen Karte belegt ist.
+- Nach dem Platzieren einer Karte kann der Spieler einen Meeple auf ein Segment (=Feature) der platzierten Karte setzen
+- Funktionen des Meeples: Ritter (Stadt), Wegelagerer (Straße) oder Mönch (Kloster)
+- Platzierung eines Meeples auf einem Segment ist nur erlaubt, wenn das entsprechende Feature auf dem gesamten verbundenen Teilfeld noch frei ist
 
 **Technische Hinweise:**
 
-- Jeder Spieler startet mit 7 Meeples.
-- Vor Platzierung muss geprüft werden, ob das gesamte Feature schon besetzt ist (per DFS - Depth-First Search - Tiefensuche).
+- Jeder Spieler verfügt über 7 Meeples
+- Tiefensuche (Depth‑First Search, DFS) prüft Besetzung
 
 #### ▶️ Speicherung der Karteninstanz
 
 - Karten-ID
-- Platzierung in Map (Koordinaten)
+- Platzierung im Spielfeld (Koordinaten)
 - Rotation
-- Spieler der sie gelegt hat
+- Spieler, der sie gelegt hat
 - Info ob Meeple gelegt wurde
-TODO- Falls ja, wohin (Segment – z.B. Stadt, Straße, Kloster und falls es mehrere Möglichkeiten gibt: Nord, Ost, West, Süd – z.B. nötig bei Karte Straßenkreuzung)
+- Features der Karte in allen Himmelsrichtungen & der Mitte (Stadt, Feld, Straße, Kloster)
 
 #### ▶️ Punktevergabe
 
-**Die Punktevergabe erfolgt während des Spiels bei vollständigen Features (fertige Städte, Straßen, vollständig umbaute Kloster) nach dieser Logik:**
+**Serverseitige Punktewertung bei vollständigen Features:**
 
-- **Stadt (vollständig):** 2 Punkte pro Karte, +2 pro Wappen
-- **Straße (vollständig):** 1 Punkt pro Karte
-- **Kloster (vollständig):** 9 Punkte (inkl. 8 umliegende Karten)
+- **Stadt (fertig):** 2 Punkte pro Karte, +2 pro Wappen
+- **Straße (fertig):** 1 Punkt pro Karte
+- **Kloster (vollständig umbaut):** 9 Punkte (inkl. 8 umliegende Karten)
 
 **Technische Hinweise:**
 
-- Punkteberechnung erfolgt serverseitig nach jedem Zug.
-- Meeples kehren in den Vorrat der betroffenen Spieler zurück, sobald ein Feature gewertet wurde.
+- Punkteberechnung erfolgt nach jedem Zug
+- Meeples kehren nach der Wertung in den Vorrat des Spielers zurück
 
 ---
 
 ### 1.3 Systemdesign
 
-#### ▶️ Backend (Spring Boot)
+#### ▶️ Server (Spring Boot)
 
 **Aufgaben des Backends:**
 
-- Spielräume erstellen, beitreten, starten
+- Spielräume erstellen, beitreten und starten
 - Spielstatus speichern und validieren
 - Spielregeln und Punktevergabe durchsetzen
-- Kommunikation mit Frontend via REST & WebSocket
-- Nutzeridentifikation (optional mit Profilen)
-
-**Wichtige Entitäten:**
-
-- **User**: Spielerprofil mit ID, Username, Password und Highscore
-- **Game**: Spielsession mit GameCode, Status und Gewinner
+- Kommunikation mit Frontend via REST-API & WebSocket
+- Spielerprofilverwaltung (ID, Username, Passwort, Highscore, etc.)
+- Authentifizierung aller Nutzeraktionen mittels JSON Web Tokens
+- Absicherung aller Endpunkte außer Login und Registrierung durch JWT‑Prüfung
 
 #### ▶️ Datenbank (PostgreSQL)
 
@@ -119,7 +121,7 @@ TODO- Falls ja, wohin (Segment – z.B. Stadt, Straße, Kloster und falls es meh
 - Spielverlauf und Statistiken
 
 **Tabellen (per Spring JPA generiert):**
-- `users`: Spieler mit ID, Name, Passwort (wird gehasht gepeichert) und Highscore
+- `users`: Spieler mit ID, Username, Passwort (gehasht) und Highscore
 - `games`: Spiele mit ID, Erstellungszeitpunkt, Status, Spielcode und Gewinner
 
 #### ▶️ Frontend (Jetpack Compose)
@@ -127,51 +129,51 @@ TODO- Falls ja, wohin (Segment – z.B. Stadt, Straße, Kloster und falls es meh
 **Funktionen:**
 
 - Authentifizierung, Lobby betreten, Spiel starten oder beitreten per Game-ID
-- Spielerübersicht inklusive aktueller Punkte in Echtzeit
+- Spielerübersicht inklusive aktueller Punkte & aktuellem Spieler in Echtzeit
 - Scroll- und zoombares Spielfeld
-- Karten ziehen inklusive Cheating-Funktion zum unberechtigten Erhalt einer neuen Karte
-- Karte rotieren und anschließend platzieren
-- Meeple platzieren oder ohne Platzierung den Zug beenden
-- Entlarven des Cheatens durch die nicht aktiven Spieler inklusive Punkteabzug für den entlarvten Spieler oder den Spieler, der zu Unrecht beschuldigt hat
-- Endansicht mit Ergebnissen
+- Karten ziehen, rotieren und platzieren
+- Meeple setzen oder ohne Platzierung den Zug beenden
+- Betrugsmodus: Cheat‑Funktion und Expose!‑Button zum Aufdecken von Betrug - mit Bestrafung bei Missbrauch
+- Animierter Endbildschirm mit finalem Punktestand
 
 **Technische Features:**
 
 - Dynamisches Tile-Grid für Spielfeld
-- WebSocket-Verbindung zur Synchronisierung
-- UI mit Buttons für Rotation (direkt mit Klick auf vergrößerte, zu platzierende Karte), Meeple-Setzen bzw. Spielzug-Beenden
+- WebSocket-Verbindungen für Synchronisierung
+- Buttons für Rotation (durch Klick auf vergrößerte, zu platzierende Karte), Meeple‑Platzierung, Zug beenden
 - Zoom- und Scroll-Gesten für Kartenansicht
+- Toast‑Meldungen an relevante Spieler für jegliche Aktionen im Spiel
 
 ---
 
-### 1.4 UIUX Anforderungen
+### 1.4 UI/UX-Anforderungen
 
 **Spielbildschirm:**
 
-**Oberer Bereich:**
+**Oben:**
 
-- Aktueller Spieler hervorgehoben
-- Punktetafel mit Farbe, Namen und Punkte aller Spieler
-- Kartendecks der noch zu ziehenden Karten
+- Aktiver Spieler hervorgehoben
+- Punktetafel mit Farbe, Namen und Punktzahl aller Spieler
+- Restliche Karten im Deck
 
-**Mittelteil:**
+**Mitte:**
 
 - Dynamisches Spielfeld (scroll-/zoombar)
-- Platzierung von Karte und Meeple per Tippen
+- Platzierung von Karte und Meeple per Tap
 
-**Unterer Bereich:**
+**Unten:**
 
-- Meeple inkl. Anzeige der verfügbaren Meeples pro Spieler
-- für den aktiven Spieler: Gezogene Karte größer dargestellt
-- Funktion 🔁 Rotieren als Vorbereitung des Platzierens per Tippen
-- für die nicht aktiven Spieler: "Expose!"-Button, zum Entlarven eines cheatenden Spielers.
+- Meeple-Platzierungs-Indikator, inkl. Anzeige der noch verfügbaren Meeples
+- Vergrößerte Ansicht der gezogenen Karte (nur für aktiven Spieler)
+- Buttons: 🔁 Rotieren als Vorbereitung des Platzierens per Tippen
+- Für die nicht aktiven Spieler: "Expose!"-Button, zum Entlarven eines Cheaters
 - "Skip-Meeple"-Button zum Beenden der Spielrunde ohne Meeple-Platzierung
-- die eigene Punktezahl des Spielers
+- Eigene Punktezahl des Spielers
 
 **Endansicht:**
 
-- Finaler Punktestand
-- Optionen: Neues Spiel / Zurück zur Lobby
+- Finaler Punktestand aller Spieler mit Hervorhebung des Gewinners
+- Button zurück zum Main Screen
 
 ---
 
@@ -179,10 +181,10 @@ TODO- Falls ja, wohin (Segment – z.B. Stadt, Straße, Kloster und falls es meh
 
 **Ablauf eines Zugs:**
 
-1. Server sendet eine zufällige Karte an den aktiven Spieler
+1. Server sendet eine zufällige Karte an aktiven Spieler
 2. Spieler rotiert und platziert die Karte
 3. Optional: Meeple platzieren
-4. Server prüft Platzierung und wertet Features
+4. Server prüft Platzierung und wertet abgeschlossene Features
 5. WebSocket-Update an alle Spieler
 6. Nächster Spieler ist an der Reihe
 
@@ -191,21 +193,20 @@ TODO- Falls ja, wohin (Segment – z.B. Stadt, Straße, Kloster und falls es meh
 - Eingaben für nicht-aktive Spieler blockieren und entsprechende Toasts senden
 - Nur gültige Aktionen erlauben, bei fehlerhaften Klicks entsprechende Toasts senden
 
-**Backend:**
+**Server:**
 
-- Eingaben validieren
-- Änderungen persistent speichern
+- Validierung aller Eingaben
+- Änderungen persistieren
 
 ---
 
 ### 1.6 Spielende
 
-Nach dem letzten Zug ist das Spielfeld vollständig, der Gewinner wird ermittelt und angezeigt genauso wie alle Punkte aller Spieler. Auch die Möglichkeit zum Menü zurückzukehren, wird angeboten.
-
+Nach dem letzten Zug berechnet der Server das Endergebnis, zeigt den Sieger und alle Punktestände an und bietet die Rückkehr zur Lobby an.
 
 **---**
 
-## 2. APP-UI - Screenshots
+## 2. App-UI - Screenshots
 
 Die folgenden Screenshots zeigen den finalen Stand der Benutzeroberfläche in der App:
 
@@ -219,23 +220,23 @@ Login/Registrierung zur Nutzerverwaltung
 
 <img src="docs/images/250624_AuthenticationScreen.png" width="50%" />
 
-### Game Lobby
-Auswahl: Neues Spiel erstellen oder bestehendem Spiel beitreten, Statistiken ansehen
+### Main Screen
+Auswahl: Neues Spiel erstellen, bestehendem Spiel beitreten, Statistiken ansehen
 
 <img src="docs/images/250624_GameLobby.png" width="50%" />
 
-### Start Game
+### Game Lobby
 Übersicht der beigetretenen Spieler und Button um das Spiel zu starten
 
 <img src="docs/images/250624_StartGame.png" width="50%" />
 
 ### Gameplay Screen
-Hauptspielbildschirm mit Karten- und Meepleplatzierung sowie Spielinformationen und ggf. Toastnachrichten
+Spielbildschirm mit Karten- und Meepleplatzierung sowie Spielinformationen und Toastnachrichten
 
 <img src="docs/images/250624_GameplayScreen.png" width="50%" />
 
 ### End of Game Screen
-Endpunktestand aller Spieler, hervorgehoben der Sieger sowie Möglichkeit zum Menü zurückzukehren
+Endpunktestand aller Spieler, mit Hervorhebung des Sieger und Möglichkeit zum Menü zurückzukehren
 
 <img src="docs/images/250624_GameFinished.png" width="50%" />
 
@@ -246,7 +247,7 @@ Endpunktestand aller Spieler, hervorgehoben der Sieger sowie Möglichkeit zum Me
 
 - 🌐 **Projekthomepage auf itch.io**:  
   👉 [https://j0klar.itch.io/pixel-carcassonne](https://j0klar.itch.io/pixel-carcassonne)
-> Hier findest du die veröffentlichte Version der App, weitere Infos, Screenshots und den Link zum Game, das du auch gerne bewerten kannst!
+> Hier findest du die veröffentlichte Version der App, weitere Infos und Screenshots des Spiels, welches du auch gerne bewerten kannst!
 
 - 🌐 **Homepage des Original-Boardgames**:  
   👉 [https://www.hans-im-glueck.de/carcassonne-familie/](https://www.hans-im-glueck.de/carcassonne-familie/)
