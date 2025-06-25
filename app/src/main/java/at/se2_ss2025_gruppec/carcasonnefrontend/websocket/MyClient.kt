@@ -17,7 +17,7 @@ import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks) {
 
-    private val webSocketURI = "ws://10.0.2.2:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
+    private val webSocketURI = "ws://192.168.0.12:8080/ws/game" // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
 
     private lateinit var client: StompClient
     private var session: StompSession? = null
