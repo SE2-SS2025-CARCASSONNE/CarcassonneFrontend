@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -43,7 +43,7 @@ android {
     testOptions {
         unitTests {
             all {
-                it.useJUnitPlatform()
+                it.useJUnit()
                 it.finalizedBy(tasks.named("jacocoTestReport"))
             }
         }
@@ -127,6 +127,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.gson.converter)
 
+    testImplementation(libs.json)
     testImplementation(libs.androidx.arch.core)
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)

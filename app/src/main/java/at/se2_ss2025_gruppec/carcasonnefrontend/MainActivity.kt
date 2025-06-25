@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.text.input.KeyboardType
 import at.se2_ss2025_gruppec.carcasonnefrontend.ApiClient.gameApi
 import at.se2_ss2025_gruppec.carcasonnefrontend.viewmodel.AuthViewModel
 import at.se2_ss2025_gruppec.carcasonnefrontend.websocket.Callbacks
@@ -92,9 +93,8 @@ import java.util.UUID
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.ui.text.toLowerCase
+import androidx.compose.foundation.text.KeyboardOptions
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.CreateGameRequest
-import java.util.Locale
 import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
@@ -356,6 +356,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField( //Password input
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(0.7f),
                     value = password,
                     onValueChange = { viewModel.password = it },
@@ -489,10 +490,10 @@ fun MainScreen(navController: NavController) {
                         Spacer(modifier = Modifier.height(12.dp))
 
                         stats?.let {
-                            StatLine(label = "High Score", value = it.highScore.toString())
-                            StatLine(label = "Win Rate", value = "${(it.winRatio * 100).toInt()}%")
                             StatLine(label = "Games Played", value = it.totalGames.toString())
                             StatLine(label = "Games Won", value = it.totalWins.toString())
+                            StatLine(label = "Win Ratio", value = "${(it.winRatio * 100).toInt()}%")
+                            StatLine(label = "High Score", value = it.highScore.toString())
                         } ?: Text("Loading...", color = Color.White)
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -870,7 +871,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
         viewModel.scoringEvents.collect { ev ->
             Toast.makeText(
                     context,
-                    "${ev.playerId} scored ${ev.points}P on a ${ev.feature.lowercase(Locale.getDefault())}!",
+                    "${ev.playerId} scored ${ev.points}P on a ${ev.feature}!",
                     Toast.LENGTH_SHORT
             ).show()
         }
@@ -1140,7 +1141,7 @@ fun TileBackRow(viewModel: GameViewModel, gameId: String, playerId: String) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        piles.forEachIndexed { index, remaining ->
+        piles.forEachIndexed { _, remaining ->
             TileBackButton(
                 remaining = remaining,
                 isEnabled = remaining > 0,
