@@ -149,7 +149,7 @@ class GameViewModel : ViewModel() {
                     updateGameWithScore(json)
 
                     viewModelScope.launch {
-                        _errorEvents.emit("$accuser exposed $culprit! –2 points")
+                        _errorEvents.emit("$accuser exposed $culprit! –2P")
                     }
                 }
 
@@ -157,7 +157,7 @@ class GameViewModel : ViewModel() {
                     val accuser = json.getString("player")
                     if (accuser == joinedPlayerName) {
                         viewModelScope.launch {
-                            _errorEvents.emit("False accusation! –1 point")
+                            _errorEvents.emit("False accusation! –1P")
                         }
                     }
                     updateGameWithScore(json)
@@ -287,7 +287,6 @@ class GameViewModel : ViewModel() {
                         // Meeple-Modus aktivieren, wenn wir uns in der Phase MEEPLE_PLACEMENT befinden
                         setMeeplePlacement(newPhase == GamePhase.MEEPLE_PLACEMENT)
 
-                        // Log.d("WebSocket", "Meeple gesetzt: ${meeple.id} an Position ($position.x, $position.y)")
                         Log.d("GameViewModel", "Meeple gesetzt: ${meeple.id}, verbleibende Meeples für $playerId: $remainingMeeple")
 
                     } catch (e: Exception) {

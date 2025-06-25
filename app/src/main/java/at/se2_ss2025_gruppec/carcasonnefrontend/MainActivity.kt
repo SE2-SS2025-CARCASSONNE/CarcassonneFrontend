@@ -1141,7 +1141,7 @@ fun TileBackRow(viewModel: GameViewModel, gameId: String, playerId: String) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        piles.forEachIndexed { index, remaining ->
+        piles.forEachIndexed { _, remaining ->
             TileBackButton(
                 remaining = remaining,
                 isEnabled = remaining > 0,
