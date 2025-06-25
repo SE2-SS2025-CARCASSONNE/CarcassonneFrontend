@@ -49,12 +49,19 @@ interface StatsApi {
 
 // Singleton Retrofit client
 object ApiClient {
-    private val retrofit = Retrofit.Builder()
-        .baseUrl("http://192.168.0.12:8080/") // Enter your local IP address instead of localhost (10.0.2.2) for real device demo!
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
+    private var serverIp: String = "192.168.0.12"
 
-    val gameApi: GameApi = retrofit.create(GameApi::class.java)
-    val authApi: AuthApi = retrofit.create(AuthApi::class.java)
-    val statsApi: StatsApi = retrofit.create(StatsApi::class.java)
+    fun init(newIp: String) {
+        serverIp = newIp
+    }
+
+    private fun retrofit(): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("http://$serverIp:8080/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+    val gameApi: GameApi get() = retrofit().create(GameApi::class.java)
+    val authApi: AuthApi get() = retrofit().create(AuthApi::class.java)
+    val statsApi: StatsApi get() = retrofit().create(StatsApi::class.java)
 }

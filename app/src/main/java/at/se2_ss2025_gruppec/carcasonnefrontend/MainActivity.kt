@@ -95,6 +95,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import at.se2_ss2025_gruppec.carcasonnefrontend.model.CreateGameRequest
+import java.util.Locale
 import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
@@ -106,16 +107,17 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Box(modifier = Modifier.fillMaxSize()) {
-                val navController = rememberNavController()
+                var serverIp by remember { mutableStateOf("192.168.0.12") }
                 var userToken by remember { mutableStateOf(TokenManager.userToken) }
+                val navController = rememberNavController()
 
-                val stompClient by remember(userToken) {
+                val stompClient by remember(userToken, serverIp) {
                     mutableStateOf(TokenManager.userToken?.let {
                         MyClient(object : Callbacks {
                             override fun onResponse(res: String) {
                                 Toast.makeText(this@MainActivity, res, Toast.LENGTH_SHORT).show()
                             }
-                        }).apply { connect() }
+                        }, serverIp = serverIp).apply { connect() }
                     })
                 }
 
@@ -123,14 +125,17 @@ class MainActivity : ComponentActivity() {
                     composable("landing") { LandingScreen(onStartTapped = {
                         navController.navigate("auth")
                     })}
+
                     composable("auth") { AuthScreen(onAuthSuccess = { jwtToken ->
                         TokenManager.userToken = jwtToken
                         userToken = jwtToken
                         navController.navigate("main")
-                    })}
+                    }, serverIp = serverIp, onServerIpChange = { newIp -> serverIp = newIp })}
+
                     composable("main") { MainScreen(navController) }
                     composable("join_game") { JoinGameScreen(navController) }
                     composable("create_game") { CreateGameScreen(navController) }
+
                     composable("lobby/{gameId}") { backStackEntry ->
                         val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
                         val playerName = TokenManager.loggedInUsername ?: "Unknown"
@@ -142,6 +147,7 @@ class MainActivity : ComponentActivity() {
                             Toast.makeText(this@MainActivity, "Connection not ready!", Toast.LENGTH_SHORT).show()
                         }
                     }
+
                     composable("gameplay/{gameId}") { backStackEntry ->
                         val gameId = backStackEntry.arguments!!.getString("gameId")!!
                         val playerName = TokenManager.loggedInUsername!!
@@ -312,7 +318,11 @@ fun LandingScreen(onStartTapped: () -> Unit) {
 }
 
 @Composable
-fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewModel()
+fun AuthScreen(
+    serverIp: String,
+    onServerIpChange: (String) -> Unit,
+    onAuthSuccess: (String) -> Unit,
+    viewModel: AuthViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val username = viewModel.username
@@ -337,6 +347,24 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                OutlinedTextField( // Server IP input
+                    modifier = Modifier.fillMaxWidth(0.7f),
+                    value = serverIp,
+                    onValueChange = { onServerIpChange(it) },
+                    label = { Text("Server IP") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = Color.White,
+                        unfocusedBorderColor = Color.White,
+                        cursorColor          = Color.White,
+                        focusedLabelColor    = Color.White,
+                        unfocusedLabelColor  = Color.White,
+                        focusedTextColor     = Color.White,
+                        unfocusedTextColor   = Color.White
+                    )
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
                 OutlinedTextField( //Username input
                     modifier = Modifier.fillMaxWidth(0.7f),
                     value = username,
@@ -378,6 +406,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                 PixelArtButton( //Login button
                     label = if (isLoading) "Logging in..." else "Login", //Simple loading indicator
                     onClick = {
+                        ApiClient.init(serverIp)
                         if (!isLoading) {
                             viewModel.login { jwt ->
                                 TokenManager.loggedInUsername = viewModel.username
@@ -391,6 +420,7 @@ fun AuthScreen(onAuthSuccess: (String) -> Unit, viewModel: AuthViewModel = viewM
                 PixelArtButton( //Register button
                     label = if (isLoading) "Registering..." else "Register",
                     onClick = {
+                        ApiClient.init(serverIp)
                         if (!isLoading) {
                             viewModel.register()
                         }
@@ -543,7 +573,7 @@ fun JoinGameScreen(navController: NavController = rememberNavController()) {
 
                 OutlinedTextField(
                     value = gameId,
-                    onValueChange = { gameId = it },
+                    onValueChange = { gameId = it.uppercase(Locale.getDefault()) },
                     label = { Text("Enter game ID") },
                     modifier = Modifier.width(220.dp),
                     singleLine = true,
@@ -871,7 +901,7 @@ fun GameplayScreen(gameId: String, playerName: String, stompClient: MyClient, na
         viewModel.scoringEvents.collect { ev ->
             Toast.makeText(
                     context,
-                    "${ev.playerId} scored ${ev.points}P on a ${ev.feature}!",
+                    "${ev.playerId} scored ${ev.points}P on a ${ev.feature.lowercase(Locale.getDefault())}!",
                     Toast.LENGTH_SHORT
             ).show()
         }
