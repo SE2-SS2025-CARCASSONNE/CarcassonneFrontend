@@ -16,7 +16,6 @@ import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import org.json.JSONObject
 
 class MyClient(val callbacks: Callbacks, serverIp: String) {
-
     private val webSocketUri = "ws://$serverIp:8080/ws/game"
 
     private lateinit var client: StompClient
