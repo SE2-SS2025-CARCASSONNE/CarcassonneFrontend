@@ -2,9 +2,9 @@
 
 # 📘 Projekt: Carcassonne für Android
 
-👉 [Hier geht's zur Projekt-Homepage auf itch.io!](https://j0klar.itch.io/pixel-carcassonne)
+👉 [Projekt-Homepage auf itch.io (+ APK Download)](https://j0klar.itch.io/pixel-carcassonne)
 
-👉 [Und hier zum detaillierten Install-Guide!](https://github.com/SE2-SS2025-CARCASSONNE/CarcassonneBackend)
+👉 [Backend-Repository mit Install-Guide](https://github.com/SE2-SS2025-CARCASSONNE/CarcassonneBackend)
 
 ## 📑 Inhaltsverzeichnis
 

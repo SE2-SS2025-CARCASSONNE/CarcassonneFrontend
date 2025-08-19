@@ -15,9 +15,8 @@ import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import org.json.JSONObject
 
-class MyClient(val callbacks: Callbacks) {
-
-    private val webSocketURI = "ws://your.server.ip:8080/ws/game" // Enter your server's IP address to play, use 10.0.2.2 for Android emulator!
+class MyClient(val callbacks: Callbacks, serverIp: String) {
+    private val webSocketUri = "ws://$serverIp:8080/ws/game"
 
     private lateinit var client: StompClient
     private var session: StompSession? = null
@@ -52,7 +51,7 @@ class MyClient(val callbacks: Callbacks) {
         scope.launch {
             try {
                 session = client.connect(
-                    webSocketURI,
+                    webSocketUri,
                     customStompConnectHeaders = mapOf("Authorization" to "Bearer $token")
                 )
                 Log.d("WebSocket", "WebSocket connection established!")
